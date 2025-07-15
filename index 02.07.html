@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>Descubra Igarassu: Mapa Interativo do Sítio Histórico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+    #header {
+      background-color: #34495e;
+      color: white;
+      text-align: center;
+      padding: 10px 20px;
+      font-size: 18px;
+      font-weight: bold;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1100;
+    }
+    #menu {
+      position: fixed;
+      top: 60px;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: white;
+      padding: 5px 0;
+      overflow-x: auto;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    #menu button {
+      display: inline-block;
+      margin: 4px 6px;
+      padding: 6px 12px;
+      border: none;
+      background-color: #2c3e50;
+      color: white;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #menu button:hover {
+      background-color: #1a252f;
+    }
+    #map {
+      position: absolute;
+      top: 105px;
+      bottom: 0;
+      width: 100%;
+    }
+    #cancelarRotaBox {
+      position: fixed;
+      bottom: 75px;
+      right: 15px;
+      z-index: 9998;
+      display: none;
+    }
+    #cancelarRotaBox button {
+      background-color: #c0392b;
+      color: white;
+      font-weight: bold;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(0,0,0,0.3);
+    }
+    #pesquisa {
+      position: fixed;
+      bottom: 15px;
+      right: 15px;
+      z-index: 9999;
+      background-color: #2980b9;
+      color: white;
+      padding: 10px 15px;
+      border-radius: 50px;
+      font-weight: bold;
+      box-shadow: 0 0 6px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+     <div style="font-size: 20px;">Descubra Igarassu:</div>
+     <div style="font-size: 14px; font-weight: normal;">Mapa Interativo do Sítio Histórico</div>
+  </div>
+
+  <div id="menu">
+    <button onclick="mostrarRota('historica')">🏛️ Rota Histórica</button>
+    <button onclick="mostrarRota('museus')">🖼️ Rota dos Museus</button>
+    <button onclick="mostrarRota('cultural')">🎨 Rota Cultural</button>
+    <button onclick="mostrarRota('igrejas')">⛪ Rota das Igrejas</button>
+    <button onclick="mostrarRota('contemplação')">🌅 Rota de Contemplação</button>
+    <button onclick="mostrarRota('gastronomia')">🍽️ Rota Gastronômica</button>
+    <button onclick="mostrarRota('tudo')">🌐 Rota Completa</button>
+  
+  
+  </div>
+
+  <div id="map"></div>
+
+  <div id="cancelarRotaBox">
+    <button onclick="cancelarRota()">❌ Cancelar Rota</button>
+  </div>
+
+  <div id="pesquisa" onclick="window.open('https://forms.gle/EXEMPLO1234567', '_blank')">📋 Avalie sua experiência</div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+
+  <script>
+    const map = L.map('map').setView([-7.8340, -34.9063], 18);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let userMarker = null;
+    let routingControl = null;
+    let currentMarkers = [];
+    let foodParkShape = null;
+
+    const avatarIcon = L.icon({
+      iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
+
+    map.locate({setView: true, maxZoom: 18, watch: true});
+    map.on('locationfound', function(e) {
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.marker(e.latlng, {icon: avatarIcon}).addTo(map)
+        .bindPopup("Você está aqui").openPopup();
+    });
+    map.on('locationerror', function(e) {
+      alert("Erro ao detectar sua localização.");
+    });
+
+    const rotas = {
+      tudo: [
+        {nome: "Ruína da Igreja de Nossa Senhora do Rosário dos Homens Pretos",desc: "<b>Endereço:</b> Rua Carlos Paes Barretto, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8364 S, 34.9084 W<br><b>Horário:</b> Não há visitação pública<br><b>Entrada:</b> Observação externa<br><b>Estacionamento:</b> Via pública em frente ao local<br><b>Descrição:</b> Ruínas da Igreja de Nossa Senhora do Rosário dos Homens Pretos. Já existia em 1701, com parte da parede lateral norte ainda de pé. Construída e mantida pela confraria de homens negros livres, com a curiosa exceção de que o tesoureiro deveria ser \"branco, de boa aparência e honesto\".<br><b>Serviços:</b> —<br><b>Recomendações:</b> Visitação apenas externa; respeitar limites de propriedade privada<br><b>Proteção:</b> FUNDARPE – Lei nº 7.970/1979; IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.836442, -34.908446]},
+        {nome: "Cemitério Público de Igarassu", desc: "<b>Endereço:</b> Rua da Saudade, s/n – Sítio Histórico, Igarassu‑PE, CEP 53660‑000<br><b>Coordenadas:</b> 7.8357 S, 34.9097 W<br><b>Horário:</b> Segunda a sábado, 7h às 17h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Parcial – calçamento irregular, sem rampa<br><b>Estacionamento:</b> Via pública ao redor<br><b>Descrição:</b> Localizado em área histórica, o Cemitério Público de Igarassu guarda sepulturas de figuras importantes da história local. É frequentemente visitado por estudiosos, genealogistas e turistas interessados na memória da cidade.<br><b>Recomendações:</b> Manter o respeito ao ambiente; não fotografar sepulturas sem autorização<br><b>Proteção:</b> Inserido em área tombada pelo IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.835676, -34.909696]},
+        {nome: "Mirante do Cemitério de Igarassu", desc: "<b>Endereço:</b> Rua da Saudade, s/n – Sítio Histórico, Igarassu‑PE, em frente do Cemitério Público<br><b>Coordenadas:</b> 7.8355 S, 34.9095 W<br><b>Horário:</b> Livre acesso<br><b>Acessibilidade:</b> Parcial – calçamento em pedra irregular<br><b>Estacionamento:</b> Via pública ao redor<br><b>Descrição:</b> Mirante com vista panorâmica para o conjunto colonial de Igarassu e áreas verdes no entorno. Espaço utilizado para contemplação e registro fotográfico por visitantes e moradores.<br><b>Recomendações:</b> Evitar acesso noturno; cuidado com desníveis e bordas<br><b>Proteção:</b> Parte integrante da ambiência protegida pelo IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.835472, -34.909554]},
+        {nome: "Maracatu Estrela Brilhante de Igarassu", desc: "<b>Endereço:</b> Rua do Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8360 S, 34.9078 W<br><b>Horário:</b> Ensaios e apresentações em datas culturais e religiosas<br><b>Estacionamento:</b> Via pública nas imediações<br><b>Descrição:</b> Fundado em 1824 é um dos maracatus mais tradicionais do Brasil. Representa a força da memória afro-brasileira e mantém viva a tradição do maracatu de baque virado com fantasias ricas, batuques intensos e cortejo real.<br><b>Serviços:</b> Oficinas, apresentações públicas, participação em eventos e cortejos<br><b>Recomendações:</b> Respeitar os rituais e tradições durante as apresentações<br><b>Instagram:</b> <a href='https://www.instagram.com/estrelabrilhantedeigarassu/' target='_blank'>@estrelabrilhantedeigarassu</a><br><b>Proteção:</b> Patrimônio Vivo de Pernambuco<br>", coords: [-7.836056, -34.907875]},
+        {nome: "Casa de Mestre", desc: "<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8359 S, 34.9077 W<br><b>Telefone:</b> —<br><b>E‑mail:</b> —<br><b>Estacionamento:</b> Vagas públicas na em frente<br><b>Descrição:</b> Espaço cultural que preserva, celebra e promove os saberes tradicionais dos mestres da cultura popular de Igarassu.<br><b>Recomendações:</b> Participar com respeito às expressões culturais locais; verificar a programação atualizada<br><b>Instagram:</b> <a href='https://www.instagram.com/casademestreoficial' target='_blank'>@casademestreoficial</a><br>", coords: [-7.835905, -34.907695]},
+        {nome: "Ruínas da Misericórdia", desc: "<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8357 S, 34.9071 W<br><b>Horário:</b> Visitação externa livre <br><b>Acessibilidade:</b> Rampas e Calçamento em piso intertravado<br><b>Estacionamento:</b> Vagas públicas nas ruas adjacentes<br><b>Descrição:</b> Vestígios arquitetônicos do antigo conjunto da Igreja e Hospital da Santa Casa de Misericórdia de Igarassu, datado do século XVI. É um dos testemunhos mais antigos da presença portuguesa no Brasil e da atuação das ordens religiosas no cuidado à saúde e à fé. Sua preservação contribui para a compreensão do passado colonial e da história da assistência social no país.<br><b>Recomendações:</b> Não ultrapassar as delimitações de segurança; ideal para observação e fotografia histórica<br><b>Proteção:</b> Tombamento federal pelo IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.835738, -34.907167]},
+        {nome: "Banda Marcial Heitor Villa-Lobos", desc: "<b>Endereço:</b> Rua Barbosa Lima, nº 144 – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8350 S, 34.9068 W<br><b>Horário:</b> Ensaios em dias alternados e apresentações públicas<br><b>Estacionamento:</b> Vagas públicas nas imediações<br><b>Descrição:</b> Reconhecida nacionalmente, a Banda Marcial Heitor Villa-Lobos é motivo de orgulho para Igarassu. Campeã de diversos concursos estaduais e interestaduais, destaca-se pela disciplina, harmonia e pelo espetáculo visual e sonoro de suas apresentações.<br><b>Serviços:</b> Ensaios abertos, apresentações cívicas e culturais, oficinas para jovens músicos<br><b>Recomendações:</b> Comparecer com antecedência nos eventos públicos para melhor visualização<br><b>Instagram:</b> <a href='https://www.instagram.com/bandamarcialheitorvillalobos/' target='_blank'>@bandamarcialheitorvillalobos</a><br>", coords: [-7.834962, -34.906866]},
+	{nome: "CAT – Centro de Atendimento ao Turista de Igarassu", desc: "<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8348 S, 34.9067 W<br><b>E‑mail:</b> turismo@igarassu.pe.gov.br<br><b>Horário:</b> Segunda a sexta, das 8h às 16h; Sabado e Domingo das 8h as 13h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Total – entrada acessível, balcão baixo, atendimento inclusivo<br><b>Estacionamento:</b> Vagas públicas em frente<br><b>Descrição:</b> O CAT é o ponto de partida para visitantes conhecerem o Sítio Histórico de Igarassu. Oferece mapas, orientações e informações sobre hospedagens, gastronomia e manifestações culturais. Atua como elo entre o turista e o patrimônio local.<br><b>Recomendações:</b> Comparecer logo ao início do passeio para otimizar o tempo de visitação<br><b>Instagram:</b> <a href='https://www.instagram.com/sepacturigarassu/' target='_blank'>@sepacturigarassu</a><br>", coords: [-7.834717, -34.906810]},
+	{nome: "Casa do Artesão de Igarassu", desc: "<b>Endereço:</b> Rua Barbosa Lima, 144, – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8348 S, 34.9067 W<br><b>Horário:</b> Segunda a sábado, das 8h às 15h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Total – acesso frontal com rampa e área de circulação livre<br><b>Estacionamento:</b> Vagas públicas em frente<br><b>Descrição:</b> Espaço dedicado à valorização e comercialização do artesanato tradicional de Igarassu. A Casa do Artesão reúne peças produzidas por artistas locais que mantêm viva a cultura popular do município. Também realiza exposições temáticas e ações educativas.<br><b>Serviços:</b> Venda de artesanato, exposições, ações culturais e oficinas<br><b>Recomendações:</b> Valorize o trabalho local e pergunte sobre a história de cada peça<br><b>Instagram:</b> <a href='https://www.instagram.com/casadoartesaoigarassu' target='_blank'>@casadoartesaoigarassu</a><br>", coords: [-7.834818, -34.906716]},
+	{nome: "Sobrado do Imperador / Casa do Patrimônio do IPHAN", desc: "<b>Endereço:</b> Rua Barbosa Lima, s/n, Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8347 S, 34.9066 W<br><b>Telefone:</b> (81) 3545‑1223<br><b>E‑mail:</b> iphan.igarassu@iphan.gov.br<br><b>Horário:</b> Segunda a sexta, das 8h às 12h e de 13h as 17h<br><b>Entrada:</b> Gratuita (visitação guiada mediante agendamento prévio)<br><b>Acessibilidade:</b> Parcial, térreo acessível<br><b>Estacionamento:</b> Vagas públicas em frente<br><b>Descrição:</b> Importante edificação colonial do século XVIII, o sobrado abriga a Casa do Patrimônio do IPHAN em Igarassu. É conhecido como “Sobrado do Imperador” pela tradição oral que associa o local à hospedagem de Dom Pedro II. Atualmente, funciona como centro de referência para ações de preservação, educação patrimonial e atendimento técnico.<br><b>Serviços:</b> Atendimento técnico do IPHAN, orientações sobre tombamento, projetos educativos e exposições temporárias<br><b>Recomendações:</b> Agendar visitas institucionais com antecedência<br><b>Proteção:</b> Edificação tombada pelo IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.834744, -34.906665]},	
+	{nome: "Casa de Câmara e Cadeia", desc: `<b>Endereço:</b> Rua Capitão Afonso Gonçalves, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8352 S, 34.9062 W<br><b>Descrição:</b> A Casa de Câmara e Cadeia de Igarassu passou por quatro sedes históricas. A primeira foi destruída no século XVII. A segunda, construída após 1675, destacava-se pelo porte e localização. A terceira funcionou no atual Sobrado do Imperador, onde D. Pedro II esteve em 1859. A sede atual, adaptada no fim do século XIX, abriga hoje a Câmara Municipal.<br><b>Visitação:</b> Pode-se acompanhar as sessões <br><b>Instagram:</b> <a href="https://www.instagram.com/camaradeigarassu/" target="_blank">@camaradeigarassu</a><br><b>Recomendações:</b> Visita guiada com foco em história e cidadania<br><b>Proteção:</b> Inserida na área tombada pelo IPHAN – Decreto-Lei nº 25/1937`, coords: [-7.835259, -34.906287]},
+	{nome: "Réplica do Marco de Pedra", desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8352 S, 34.9061 W<br><b>Descrição:</b> Réplica do marco de pedra que delimitava as capitanias de Igarassu e Itamaracá no período colonial. O original ficava no Sítio dos Marcos, nas proximidades do Canal de Santa Cruz, sendo referência geográfica e política do início da colonização portuguesa no Brasil.<br><b>Recomendações:</b> Ideal para fotografias e interpretação histórica<br><b>Proteção:</b> Inserida na ambiência protegida do Sítio Histórico pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.835241, -34.906110]},
+	{nome: "Gramado do Sítio Histórico", desc: `<b>Endereço:</b> Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8344 S, 34.9058 W<br><b>Descrição:</b> Amplo espaço de contemplação em meio ao casario colonial, ideal para observar o nascer do sol e da lua. Local privilegiado para piqueniques, encontros culturais e acompanhamento de festividades tradicionais, como cortejos e celebrações ao ar livre.<br><b>Recomendações:</b> Levar toalha ou esteira, respeitar o patrimônio ao redor, ideal para fotografias<br><b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.834459, -34.905842]},
+	{nome: "Recolhimento do Sagrado Coração de Jesus", desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br> <b>Coordenadas:</b> 7.8344 S, 34.9065 W<br><b>Descrição:</b> Fundado em 1º de março de 1742 pelos padres Miguel Rodrigues Sepúlvida e Gabriel Malagrida, o Recolhimento tinha como missão amparar e educar a juventude feminina, oferecendo assistência espiritual e formação religiosa as quais duram até os dias atuais.<br><b>Instagram:</b> <a href="https://www.instagram.com/oscjconventoigarassu/" target="_blank">@oscjconventoigarassu</a><br><b>Recomendações:</b> Verificar taxa para visitação. Visitação com sensibilidade ao ambiente religioso<br><b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico de Igarassu pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.834489, -34.906512]},
+	{nome: "Obra Social do Sagrado Coração de Jesus", desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8345 S, 34.9066 W<br><b>Descrição:</b> Braço comunitário do Recolhimento do Sagrado Coração de Jesus, a Obra Social promove ações de educação, cultura, cidadania e solidariedade. Atende crianças, jovens e famílias em situação de vulnerabilidade, oferecendo oficinas, apoio pedagógico, formação religiosa e atividades culturais.<br><b>Instagram:</b> <a href="https://www.instagram.com/oscjconventoigarassu/" target="_blank">@oscjconventoigarassu</a><br><b>Recomendações:</b> Agendar visitas institucionais e acompanhar os projetos nas redes sociais<br><b>Proteção:</b> Inserida na ambiência tombada do Sítio Histórico pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.834595, -34.906619]},
+	{nome: "Igreja de Nossa Senhora da Conceição", desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8345 S, 34.9066 W<br><b>Descrição:</b> Integrada ao conjunto do Recolhimento do Sagrado Coração de Jesus, a igreja dedicada a Nossa Senhora da Conceição foi construída no século XVIII e conserva características da arquitetura religiosa colonial. Servia como espaço de oração e celebração das internas recolhidas e, até hoje, mantém seu uso litúrgico, especialmente em datas comemorativas.<br><b>Instagram:</b> <a href="https://www.instagram.com/oscjconventoigarassu/" target="_blank">@oscjconventoigarassu</a><br><b>Recomendações:</b> Participar de celebrações litúrgicas e visitas guiadas mediante agendamento<br><b>Proteção:</b> Edificação inserida na ambiência tombada do Sítio Histórico de Igarassu – IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.834319, -34.906405]},
+	{nome: "Museu Histórico de Igarassu", desc: "<b>Descrição:</b> Fundado em 24 de janeiro de 1954 pelo Dr. José Eduardo da Silva Brito – então presidente do Instituto Histórico de Igarassu. Em janeiro de 1972, não tendo como manter o acervo, o Instituto Histórico doou para Prefeitura Municipal de Igarassu todo seu acervo e patrimônio que, atualmente, ocupa três casas do século XVIII. Seu acervo é composto por 560 peças das quais 266 estão em exposição. O Museu possui também, um Departamento de Pesquisa Histórica, responsável pela guarda de importantes documentos da história de nossa cidade. Destaque para as exposições de peças sacras, armas e numismática.<br><b>Email:</b> museuhistorico@igarassu.pe.gov.br<br><b>Instagram:</b> <a href='https://instagram.com/mhigarassu' target='_blank'>@mhigarassu</a><br><b>Acessibilidade:</b> Sim, com rampas de acesso laterais e banheiro acessível.", coords: [-7.834053, -34.906354]},
+        {nome: "Igreja dos Santos Cosme e Damião", desc: `<b>Endereço:</b> Praça da Matriz, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8339 S, 34.9061 W<br><b>Descrição:</b> Reconhecida pelo IPHAN como a <b>igreja mais antiga do Brasil em funcionamento</b>, a Igreja dos Santos Cosme e Damião foi erguida a partir de 1535. A estrutura original de taipa ruiu por volta de 1590, sendo substituída por uma construção em pedra e cal entre 1595 e 1597, mediante alvará real.<br> Ampliada no século XVIII com recursos da Coroa, teve sua importância reafirmada por estudiosos como o Prof. C. Smith, da Universidade da Pensilvânia. Em 1958, passou por restauração, recuperando características maneiristas originais.<br><b>Estilo:</b> Maneirista<br><b>Horário de visitação:</b><br>• Segunda: 9h às 15h<br>• Terça a sexta: 9h às 17h<br>• Sábado e domingo: 9h às 13h<br><b>Missas:</b><br>• Quinta: 19h<br>• Domingo: 7h e 19h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Parcial – com rampas laterais e nave central livre<br><b>Serviços:</b> Missas dominicais, visitas guiadas<br><b>Estacionamento:</b> Na rua lateral da igreja<br><b>Instagram:</b> <a href="https://www.instagram.com/paroquiacosmeedamiaoigarassu/" target="_blank">@paroquiacosmeedamiaoigarassu</a><br><b>Proteção:</b> Tombamento federal pelo IPHAN – Decreto‑Lei nº 25/1937<br><b>Recomendações:</b> Visitação respeitosa, ideal para estudos de arquitetura sacra, turismo histórico e momentos de espiritualidade.`, coords: [-7.833936, -34.906166]},
+	{nome: "Museu da Igreja dos Santos Cosme e Damião", desc: `<b>Endereço:</b> Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8336 S, 34.9060 W<br><b>Descrição:</b> Localizado no primeiro andar da Casa Paroquial, o museu foi inaugurado em 2022 após cuidadosa reforma interna. O acesso é feito pela sacristia da Igreja dos Santos Cosme e Damião. O acervo reúne objetos litúrgicos, imagens sacras e registros da historia religiosa em torno dos Santos Cosme e Damião.<br>Em dias de missa, funciona tambem um espaço de café anexo ao museu, que oferece pratos e quitutes preparados pelos seminaristas e por grupos da paróquia.<br><b>Horário de funcionamento:</b> Mesmo da igreja:<br>• Segunda: 9h às 15h<br>• Terça a sexta: 9h às 17h<br>• Sábado e domingo: 9h às 13h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Parcial, com rampas e baheiro acessivel<br><b>Instagram:</b> <a href="https://www.instagram.com/museu_scd" target="_blank">@museu_scd</a><br><b>Recomendações:</b> Visitação guiada mediante agendamento. Ideal para estudantes, peregrinos e interessados em história e cultura religiosa.<br><b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico de Igarassu – IPHAN – Decreto-Lei nº 25/1937`, coords: [-7.833646, -34.906005]},
+	{nome: "Biblioteca Pública Municipal", desc: `<b>Endereço:</b> Rua Frei Caneca, 24 – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8347 S, 34.9068 W<br><b>Descrição:</b> Instalada em edifício de valor histórico no Sítio Histórico de Igarassu, a Biblioteca Pública Municipal é um importante espaço de leitura, pesquisa e formação cidadã. Seu acervo contempla literatura, história local, obras infantis e material de apoio escolar. O equipamento também promove contação de histórias, oficinas, rodas de leitura e eventos educativos voltados à valorização da cultura e à democratização do acesso ao conhecimento.<br><b>Horário de funcionamento:</b> Segunda a sexta, das 7h30 às 17h<br><b>Instagram:</b> <a href="https://www.instagram.com/bibliotecapmigarassu/" target="_blank">@bibliotecapmigarassu</a><br><b>Acessibilidade:</b> Parcial – entrada com rampa<br><b>Recomendações:</b> Visitação recomendada para estudantes, educadores, pesquisadores e famílias<br><b>Proteção:</b> Inserida na ambiência do Sítio Histórico de Igarassu, tombado pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.833351, -34.905834]},
+	{nome: "Convento Franciscano de Igarassu", desc: `<b>Endereço:</b> Sítio Histórico, Igarassu‑PE<br> <b>Coordenadas:</b> 7.832554 S, 34.904801 W<br> <b>Descrição:</b> Fundado em 1588 pelos frades da Ordem Franciscana (OFM), foi o terceiro convento franciscano do Brasil. Durante a ocupação holandesa (1630–1654), foi saqueado e abandonado, sendo reconstruído a partir de 1661 e concluído em 1693. No século XVIII recebeu decoração barroca, com azulejos, talha dourada e pintura em teto; abriga hoje 3 instituições importantes: o Museu Pinacoteca de Igarassu, o Seminitário Prepedeutico e a Sede do Vicariato.<br><b>Arquitetura:</b> Barroco franciscano nordestino, com galilé de três arcos, torre sineira, cruzeiro no adro e interiores revestidos de azulejos do séc. XVII–XVIII.<br><b>Museu Pinacoteca:</b> No interior, apresenta painéis e pinturas de arte sacra colonial (séc. XVII–XVIII) e elementos litúrgicos.<br> <b>Acesso:</b> Visitação guiada disponível; acesso ao claustro e museu.<br><b>Recomendações:</b> Ideal para estudos de arquitetura barroca, restauração e história colonial.<br><b>Proteção:</b> Tombado federalmente pelo IPHAN – Livro do Tombo nº 131, desde 17‑05‑1938; parte do Centro Histórico protegido desde 1972.`, coords: [-7.832554, -34.904801]},        
+	{nome: "Igreja de Santo Antônio (Convento Franciscano)",
+  	desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832645 S, 34.905061 W<br>
+	<b>Descrição:</b> Parte integrante do Convento Franciscano construído a partir de 1588 pelos frades da Ordem dos Franciscanos (OFM), a Igreja de Santo Antônio apresenta exemplar arquitetura barroca franciscana nordestina. Sua fachada, com galilé de três arcos e torre sineira lateral, dá acesso a um interior ricamente decorado com azulejos portugueses e talhas douradas do século XVII–XVIII :contentReference[oaicite:1]{index=1}.<br>
+	<b>Casamentos:</b> O templo é muito procurado para celebrações matrimoniais, devido ao seu valor histórico e beleza arquitetônica, sendo palco de cerimônias tradicionais com forte valor simbólico.<br>
+	<b>Contexto histórico:</b> Reconstruída após invasão holandesa (1630–1654), a igreja faz parte do conjunto que abriga o Museu Pinacoteca de Igarassu. Foi tombada pelo IPHAN em 1938 e está situada em pleno centro do Sítio Histórico, protegido desde 1972 :contentReference[oaicite:2]{index=2}.<br>
+	<b>Recomendações:</b> Ideal para cerimônias religiosas, estudos de arte barroca, arquitetura e fotografia patrimonial.<br>
+	<b>Proteção:</b> Tombamento federal pelo IPHAN – Decreto‑Lei nº 25/1937`,
+ 	coords: [-7.832645, -34.905061]
+	},
+	{nome: "Museu Pinacoteca de Igarassu",
+ 	desc: `<b>Endereço:</b> Rua Dantas Barreto, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.83254 S, 34.90462 W<br>
+	<b>Descrição:</b> Instalado no antigo dormitório dos noviços do Convento Franciscano (1705), o museu foi criado em 1957 e abriga uma coleção de cerca de 25 painéis e pinturas sacras dos séculos XVII e XVIII, além de elementos litúrgicos, provenientes da Sé de Olinda, da Igreja dos Santos Cosme e Damião e do próprio convento :contentReference[oaicite:1]{index=1}.<br>
+	<b>Horário de funcionamento:</b><br>
+	• Segunda a sexta: 9h às 17h<br>
+	• Sábado e domingo: mediante agendamento prévio<br>
+	<b>Ingresso:</b><br>
+	• Inteira: R$ 5,00<br>
+	• Meia: R$ 2,50<br>
+	• Gratuito para escolas públicas agendadas<br>
+	<b>Contato:</b> WhatsApp: <a href="https://wa.me/5581981751463" target="_blank">(81) 98175-1463</a><br>
+	<b>Serviços:</b> Visitas guiadas<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/muspi.igarassu/" target="_blank">@muspi.igarassu</a><br>
+	<b>Recomendações:</b> Ideal para quem estuda arte sacra colonial e história religiosa; visitar com calma para contemplar painéis do século XVII–XVIII<br>
+	<b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico de Igarassu pelo IPHAN – Decreto‑Lei nº 25/1937`,
+ 	coords: [-7.832538, -34.904616]
+	},
+	{nome: "Ruína da Capela da Ordem Terceira de Igarassu",
+  	desc: `<b>Endereço:</b> Ao lado do Convento Franciscano – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832440 S, 34.905303 W<br>
+	<b>Descrição:</b> Remanescente da Capela da Ordem Terceira de São Francisco, construída no século XVII pelos irmãos terceiros da cidade. Após danos estruturais e abandono progressivo, restam apenas parte das paredes e fundações, que testemunham a presença leiga franciscana e sua influência cultural e religiosa.<br>
+	<b>Recomendações:</b> Visitação externa, ideal para registros fotográficos e roteiros históricos.<br>
+	<b>Proteção:</b> Inserida na ambiência protegida do Sítio Histórico de Igarassu – IPHAN – Decreto‑Lei nº 25/1937`,
+  	coords: [-7.832440, -34.905303]
+	},
+	{nome: "Refúgio das Bromélias",
+  	desc: `<b>Endereço:</b> Às margens do Rio Igarassu – Sítio Histórico<br>
+	<b>Coordenadas:</b> 7.833636 S, 34.904809 W<br>
+	<b>⚠ Aviso:</b> Atrativo turístico de propriedade particular. A visitação requer agendamento prévio.<br>
+	<b>Agendamento:</b> Exclusivamente pelo formulário: <a href="https://forms.gle/5yYDdjsEAFcjDBU37" target="_blank">Clique aqui para agendar</a><br>
+	<b>Dúvidas:</b> Caso não sejam esclarecidas no formulário, utilize o WhatsApp: <a href="https://wa.me/5581988174392" target="_blank">(81) 98817-4392</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/refugiodasbromelias/" target="_blank">@refugiodasbromelias</a><br>
+	<b>💵 Valores:</b><br>
+	• Entrada individual: R$ 10,00<br>
+	• Escolas (por estudante): R$ 5,00<br>
+	• Passeio de jangada (opcional): R$ 5,00<br>
+	<b>🕐 Horário de funcionamento:</b><br>
+	• Terça a domingo: das 9h às 14h30<br>
+	<b>Recomendações:</b> Ideal para quem busca contato com a natureza, trilhas leves, apreciação da vegetação nativa e passeios rústicos de jangada pelo rio Igarassu.<br>
+	<b>Proteção:</b> Situado na zona de amortecimento do Sítio Histórico de Igarassu (IPHAN)`,
+  	coords: [-7.833636, -34.904809]
+	},
+	{
+  	nome: "Espaço Cultural Vovôzito",
+  	desc: `<b>Endereço:</b> Avenida Marechal Hermes, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834653 S, 34.905474 W<br>
+	<b>Descrição:</b> Fundado em 2013 pelo bonequeiro Antero Assis, o Espaço Cultural Vovôzito é um núcleo criativo dedicado à pesquisa, formação, produção e fruição das artes cênicas com foco em teatro de bonecos. Localizado no coração do Sítio Histórico de Igarassu, abriga um acervo com mais de 100 bonecos de diversas técnicas: mamulengos, marionetes, ventríloquos, bonecos de balcão, gigantes, de espuma e outros.<br>
+	O espaço promove oficinas, ciclos de debates, espetáculos e visitas guiadas, sendo reconhecido como ponto de encontro de artistas, educadores, ONGs, escolas e turistas do Brasil e do mundo. Entre seus destaques está o <b>Festival de Teatro de Bonecos de Igarassu</b>, que oferece espetáculos gratuitos à comunidade e fomenta a cultura popular nordestina.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/espacoculturalvovozitooficial/" target="_blank">@espacoculturalvovozitooficial</a><br>
+	<b>Recomendações:</b> Ideal para estudantes, artistas e amantes da cultura popular; agende visitas para grupos escolares e culturais.<br>
+	<b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico de Igarassu pelo IPHAN – Decreto‑Lei nº 25/1937`,
+  	coords: [-7.834653, -34.905474]
+	},
+	{
+  	nome: "Truká Espaço Cultural",
+  	desc: `<b>Endereço:</b> Avenida Marechal Hermes, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834749 S, 34.905480 W<br>
+	<b>Descrição:</b> O Truká Espaço Cultural é um polo multicultural independente que fomenta arte, cultura e economia criativa em Igarassu. Atuando como um centro de formação e expressão, promove atividades contínuas voltadas à comunidade local e visitantes.<br>
+	<b>Atividades e serviços:</b><br>
+	📍 Eventos culturais<br>
+	📍 Feira colaborativa de economia solidária<br>
+	📍 Oficinas de arte e criação<br>
+	📍 Luthieria e experimentações musicais<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/espacotruka/" target="_blank">@espacotruka</a><br>
+	<b>WhatsApp:</b> <a href="https://wa.me/5581995643283" target="_blank">(81) 99564-3283</a><br>
+	<b>Recomendações:</b> Ideal para quem busca vivências artísticas, intercâmbio cultural e ações comunitárias no Sítio Histórico de Igarassu.<br>
+	<b>Proteção:</b> Situado na área de influência direta do Sítio Histórico tombado pelo IPHAN – Decreto‑Lei nº 25/1937`,
+  	coords: [-7.834749, -34.905480]
+	},
+	{
+  	nome: "Paranã Puka – Cozinha Cultural",
+  	desc: `<b>Endereço:</b> Avenida Marechal Hermes, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834824 S, 34.905480 W<br>
+	<b>Descrição:</b> O Paranã Puka é um espaço gastronômico e cultural que oferece muito mais que alimentação: promove encontros, sabores e tradições em pleno coração do Sítio Histórico de Igarassu. Com culinária afetiva e ambiente acolhedor, o espaço também sedia apresentações artísticas e colabora com os movimentos culturais da cidade.<br>
+	<b>Horário de funcionamento:</b><br>
+	• Segunda, terça e quarta: 11h30 às 16h<br>
+	• Quinta, sexta e sábado: 11h30 às 23h<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/parana_puka/" target="_blank">@parana_puka</a><br>
+	<b>WhatsApp:</b> <a href="https://wa.me/5581982981283" target="_blank">(81) 98298-1283</a><br>
+	<b>Recomendações:</b> Ideal para quem deseja vivenciar a culinária local com toque artístico, experimentar pratos autorais e curtir eventos em um ambiente autêntico.<br>
+	<b>Proteção:</b> Localizado na ambiência do Sítio Histórico tombado pelo IPHAN – Decreto‑Lei nº 25/1937`,
+ 	 coords: [-7.834824, -34.905480]
+	},
+	{
+  	nome: "Pôr do Sol na Igreja dos Santos Cosme e Damião",
+  	desc: `<b>Endereço:</b> Igreja dos Santos Cosme e Damião – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833761 S, 34.906303 W<br>
+	<b>Descrição:</b> Um dos momentos mais sublimes do Sítio Histórico de Igarassu é o entardecer visto da Igreja dos Santos Cosme e Damião. A luz do pôr do sol incide sobre vegetação, criando um cenário ideal para contemplação, oração, fotografia e visitas culturais.<br>
+	<b>Acesso:</b><br>
+	• Disponível apenas mediante agendamento prévio<br>
+	• Ou durante plantões pastorais do Pároco às <b>quintas-feiras</b><br>
+	<b>Recomendações:</b> Visitar no fim da tarde para desfrutar da vista e, se possível, combinar com agendamento do museu ou participação nas missas.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/paroquiacosmeedamiaoigarassu/" target="_blank">@paroquiacosmeedamiaoigarassu</a><br>
+	<b>Proteção:</b> Parte integrante do Sítio Histórico tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.833761, -34.906303]
+	},
+	{
+  	nome: "Pôr do Sol do Museu Histórico de Igarassu",
+  	desc: `<b>Endereço:</b> Museu Histórico de Igarassu – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833957 S, 34.906453 W<br>
+	<b>Descrição:</b> Um dos ângulos mais privilegiados para contemplar o pôr do sol no Sítio Histórico de Igarassu é a área posterior do Museu Histórico. A luz suave do entardecer se projeta sobre o rio, compondo um cenário ideal para contemplação e fotografia.<br>
+	<b>Acesso:</b> Permitido apenas mediante <b>agendamento prévio</b> ou durante <b>eventos oficiais</b> promovidos pelo museu.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/mhigarassu/" target="_blank">@mhigarassu</a><br>
+	<b>Recomendações:</b> Ideal para quem aprecia cultura, história e fotografia ao ar livre. O local proporciona um dos entardeceres mais belos de Pernambuco.<br>
+	<b>Proteção:</b> Imóvel integrante do Sítio Histórico tombado pelo IPHAN – Decreto‑Lei nº 25/1937`,
+  	coords: [-7.833957, -34.906453]
+	},
+	{
+  	nome: "Auditório do Museu Histórico de Igarassu",
+  	desc: `<b>Endereço:</b> Museu Histórico de Igarassu – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834053 S, 34.906324 W<br>
+	<b>Descrição:</b> Integrado ao complexo do Museu Histórico de Igarassu, o auditório funciona como espaço de apoio a eventos culturais, seminários, palestras, lançamentos de livros e ações formativas. Seu uso é reservado a ocasiões em que o museu promove ou apoia atividades culturais e educativas.<br>
+	<b>Sobre o museu:</b> Fundado em 24 de janeiro de 1954 pelo Dr. José Eduardo da Silva Brito, o Museu Histórico de Igarassu reúne um acervo de 560 peças (266 em exposição), distribuídas por três casas coloniais do século XVIII. Entre os destaques estão peças sacras, armas, numismática e documentos raros da história local, guardados por seu Departamento de Pesquisa Histórica.<br>
+	<b>Email:</b> <a href="mailto:museuhistorico@igarassu.pe.gov.br">museuhistorico@igarassu.pe.gov.br</a><br>
+	<b>Instagram:</b> <a href="https://instagram.com/mhigarassu" target="_blank">@mhigarassu</a><br>
+	<b>Acessibilidade:</b> Sim – com rampas laterais e banheiros adaptados<br>
+	<b>Recomendações:</b> Consulte a programação cultural do museu para participar dos eventos realizados no auditório.<br>
+	<b>Proteção:</b> Integrante do conjunto tombado do Sítio Histórico de Igarassu – Decreto-Lei nº 25/1937`,
+  	coords: [-7.834053, -34.906324]
+	},
+	{
+  	nome: "Mirante do Centro de Atendimento ao Turista (CAT)",
+  	desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834584 S, 34.906933 W<br>
+	<b>Descrição:</b> Anexo ao CAT – Centro de Atendimento ao Turista de Igarassu, o mirante é um espaço convidativo para contemplação do Sítio Histórico. Oferece uma vista panorâmica dos telhados coloniais, da vegetação e do horizonte, sendo ideal para descanso, conversas e fotos. Possui uma pequena praça com bancos e arborização.<br>
+	<b>Funcionamento do CAT:</b><br>
+	• Segunda a sexta: 8h às 16h<br>
+	• Sábado e domingo: 8h às 13h<br>
+	<b>Entrada:</b> Gratuita<br>
+	<b>Acessibilidade:</b> Total – entrada acessível, balcão baixo, atendimento inclusivo<br>
+	<b>Estacionamento:</b> Vagas públicas em frente<br>
+	<b>Serviços no CAT:</b> Informações turísticas, mapas, roteiros culturais, hospedagens e gastronomia local<br>
+	<b>E-mail:</b> <a href="mailto:turismo@igarassu.pe.gov.br">turismo@igarassu.pe.gov.br</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/sepacturigarassu/" target="_blank">@sepacturigarassu</a><br>
+	<b>Recomendações:</b> Inicie seu roteiro por aqui para aproveitar orientações e planejar sua visita com apoio técnico da equipe do CAT.<br>
+	<b>Proteção:</b> Localizado na área do Sítio Histórico de Igarassu, tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.834584, -34.906933]
+	},
+	{
+  	nome: "Polloka Pizzaria e Açaiteria",
+  	desc: `<b>Endereço:</b> Rua Dantas Barreto – PE<br>
+	<b>Coordenadas:</b> 7.832908 S, 34.905815 W<br>
+	<b>Descrição:</b> A Polloka é uma pizzaria e açaiteria que combina sabor, descontração e tradição em pleno coração do Sítio Histórico de Igarassu. Ideal para uma pausa gastronômica após o passeio, o local oferece cardápio variado com pizzas artesanais e açaís bem servidos. Ambiente acolhedor e atendimento atencioso tornam a experiência ainda mais especial.<br>
+	<b>Funcionamento:</b> Terça a domingo<br>
+	<b>Delivery:</b> Das 17h30 às 22h30<br>
+	<b>Pedidos por loja:</b><br>
+	• <b>Tabatinga:</b> <a href="https://wa.me/5581983488461" target="_blank">(81) 98348‑8461</a><br>
+	• <b>Sítio Histórico:</b> <a href="https://wa.me/5581992361549" target="_blank">(81) 99236‑1549</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/polloka.pizzaeacai/" target="_blank">@polloka.pizzaeacai</a><br>
+	<b>Recomendações:</b> Ideal para jantares rápidos ou um lanche no fim de tarde após visitar os museus e igrejas da região histórica.<br>
+	<b>Categoria:</b> Rota Gastronômica`,
+  	coords: [-7.832908, -34.905815]
+	},
+	{
+  	nome: "Capela de Nossa Senhora do Livramento",
+  	desc: `<b>Endereço:</b> Praça da Bandeira, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833165 S, 34.906660 W<br>
+	<b>Descrição:</b> De origem incerta, a Capela de Nossa Senhora do Livramento é tradicionalmente atribuída ao terceiro quartel do século XVIII. A data inscrita em sua fachada, 1774, corresponde a uma importante reforma e ampliação, e não à sua construção original. Estudos de restauro revelaram que a estrutura inicial era de pedra e cal, com nave de menores proporções e sacristia sem piso superior.<br>
+	Em 1782, segundo o II Livro de Tombo da vila de Igarassu, a irmandade já estava oficialmente constituída, sob a presidência do Sr. Joaquim Rodrigues da Costa Queimado. Após o desabamento do teto em 1958, a capela foi restaurada em 1972 e novamente em 1986. Apresenta características do estilo barroco, com elementos arquitetônicos preservados graças aos esforços de conservação.<br>
+	<b>Visitação:</b> Apenas mediante <b>agendamento prévio</b> junto à Secretaria Executiva de Patrimônio Histórico<br>
+	<b>Email para agendamento:</b> <a href="mailto:patrimoniohistorico@igarassu.pe.gov.br">patrimoniohistorico@igarassu.pe.gov.br</a><br>
+	<b>Recomendações:</b> Ideal para pesquisadores, estudiosos de arte sacra e visitantes interessados no patrimônio religioso barroco<br>
+	<b>Proteção:</b> Integrante do Sítio Histórico de Igarassu, tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.833165, -34.906660]
+	},
+	{
+  	nome: "Prefeitura Municipal de Igarassu – Paço Municipal (Palácio de Afonso Gonçalves)",
+  	desc: `<b>Endereço:</b> Praça da Bandeira, Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833250 S, 34.906593 W<br>
+	<b>Descrição:</b> O edifício da Prefeitura de Igarassu, conhecido como Paço Municipal ou Palácio de Afonso Gonçalves, foi construído na segunda metade do século XIX. Em 1920, passou a integrar o patrimônio público municipal, tornando-se sede do Poder Executivo. Sua arquitetura reflete a transição do período colonial para as formas administrativas republicanas, conservando elementos estruturais da época.<br>
+	<b>Atendimento:</b> Conforme expediente administrativo da Prefeitura Municipal<br>
+	<b>Categoria:</b> Patrimônio institucional<br>
+	<b>Proteção:</b> Localizado dentro do Sítio Histórico de Igarassu, tombado pelo IPHAN – Decreto-Lei nº 25/1937<br>
+	<b>Recomendações:</b> Indicado para registros fotográficos externos, observação arquitetônica e contextualização urbana da função pública no núcleo histórico.`,
+  	coords: [-7.833250, -34.906593]
+	},
+	{
+ 	 "nome": "Instituto Histórico e Geográfico de Igarassu",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833516 S, 34.906528 W<br>
+	<b>Descrição:</b> Fundado em 23 de maio de 1953, o Instituto Histórico e Geográfico de Igarassu (IHGI) é uma das instituições culturais mais antigas de Pernambuco, dedicada à preservação e estudo da história local. Após um período de inatividade, foi reativado em 1998 por um grupo de cidadãos comprometidos com a memória da cidade. Desde então, o IHGI tem promovido eventos culturais, palestras e publicações que valorizam o patrimônio histórico de Igarassu.<br>
+	<b>Visitação:</b> Aberto ao público apenas durante eventos ou mediante agendamento prévio.<br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/instituto.historico.igarassu/' target='_blank'>@instituto.historico.igarassu</a><br>`,
+  	"coords": [-7.833516, -34.906528]
+	},
+	{
+ 	"nome": "Academia Igarassuense de Cultura e Letras",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833482 S, 34.906485 W<br>
+	<b>Descrição:</b> Fundada com o propósito de promover e preservar a cultura e a literatura local, a Academia Igarassuense de Cultura e Letras realiza diversas atividades culturais, como saraus, concursos literários e eventos educativos. Destacam-se iniciativas como o projeto "Poesia na Praça", que visa aproximar a literatura da comunidade, especialmente dos jovens estudantes. A instituição também é responsável pela organização do concurso "Igarassu em Cores, Versos e Prosas", incentivando a produção literária entre os alunos das escolas locais. As visitas à sede são realizadas apenas durante eventos ou mediante agendamento prévio.<br>
+	<b>Contato:</b> academia.letras.igarassu@bol.com.br<br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/academiaigarassuense/' target='_blank'>@academiaigarassuense</a><br>`,
+  	"coords": [-7.833482, -34.906485]
+	},
+	{
+ 	"nome": "Bloco Lírico Verde Linho",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833452 S, 34.906429 W<br>
+	<b>Descrição:</b> Fundado em setembro de 2019, o Bloco Lírico Verde Linho é a primeira agremiação lírica do município de Igarassu. Inspirado na tradição do frevo de bloco, o grupo resgata a elegância dos antigos carnavais de Pernambuco por meio de fantasias refinadas, estandarte bordado e uma orquestra de pau e corda que executa marchinhas e frevos líricos.<br>
+	<b>Atividades:</b> Participa ativamente do calendário carnavalesco com desfiles, ensaios abertos, acertos de marcha e eventos culturais no Sítio Histórico. É reconhecido por valorizar a música tradicional e fortalecer a identidade cultural igarassuense.<br>
+	<b>Visitação:</b> Sede aberta ao público apenas durante eventos ou mediante <b>agendamento prévio</b>.<br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/verde.linho/' target='_blank'>@verde.linho</a><br>
+	<b>Recomendações:</b> Ideal para visitantes que desejam vivenciar a cultura do frevo lírico, registrar belos momentos fotográficos e conhecer uma das manifestações mais autênticas da cidade.`,
+  	"coords": [-7.833452, -34.906429]
+	},
+	{
+  	"nome": "Casa Igarassu – Hospedagem Cultural",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833670 S, 34.906389 W<br>
+	<b>Descrição:</b> A Casa Igarassu é uma hospedagem alternativa situada no coração do Sítio Histórico de Igarassu. Oferece ambiente acolhedor e imersivo, conectando os visitantes à cultura local por meio da convivência direta com o patrimônio, moradores e experiências afetivas.<br>
+	<b>Estrutura:</b> A casa conta com <b>dois quartos disponíveis</b>, sendo ideal para visitantes que desejam explorar o Centro Histórico com tranquilidade e conforto. Desde sua fundação, já recebeu mais de <b>520 hóspedes</b>.<br>
+	<b>Guias locais:</b> Visitas e experiências são mediadas por <a href='https://www.instagram.com/jallessantos/' target='_blank'>@jallessantos</a> e pelo projeto <a href='https://www.instagram.com/conhecerigarassu/' target='_blank'>@conhecerigarassu</a>, que conduz roteiros históricos, culturais e gastronômicos personalizados.<br>
+	<b>Mais informações e reservas:</b> <a href='https://linktr.ee/jalles' target='_blank'>linktr.ee/jalles</a><br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/casaigarassu/' target='_blank'>@casaigarassu</a><br>
+	<b>Recomendações:</b> Ideal para turistas que desejam vivenciar a cidade de maneira afetiva, com contato direto com artistas, moradores e pontos turísticos do entorno.`,
+  	"coords": [-7.833670, -34.906389]
+	},
+	{
+  	"nome": "Donatário Café",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, 64 – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833600 S, 34.906400 W<br>
+	<b>Descrição:</b> Localizado no coração do Sítio Histórico de Igarassu, o Donatário Café oferece uma experiência única que combina o aroma do café com o charme do patrimônio local. O ambiente acolhedor é ideal para encontros, leitura ou simplesmente apreciar uma boa xícara de café.<br>
+	<b>Horário de funcionamento:</b><br>
+	• Segunda a sexta: 13h às 22h<br>
+	• Sábado: 15h às 22h<br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/donatariocafe/' target='_blank'>@donatariocafe</a><br>
+	<b>Recomendações:</b> Perfeito para quem deseja desfrutar de momentos tranquilos em um ambiente histórico, saboreando cafés especiais e acompanhamentos deliciosos.`,
+  	"coords": [-7.833739, -34.906397]
+	},
+	{
+  	"nome": "Ateliê Kamayurá",
+  	"desc": `<b>Endereço:</b> Rua Dr. José Elísio, 9 – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833011 S, 34.906740 W<br>
+	<b>Descrição:</b> Fundado pelo artista plástico Edson Bezerra, o Ateliê Kamayurá foi um espaço cultural de destaque no Sítio Histórico de Igarassu, dedicado à arte indígena, oficinas de grafite, exposições artísticas e ações educativas.<br>
+	<b>Situação atual:</b> <span style="color:red;"><b>Fechado temporariamente</b></span> em virtude do falecimento do fundador. Recomenda-se verificar com os herdeiros ou órgãos culturais municipais sobre eventual reabertura ou continuidade das atividades.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/ateliekamayura/" target="_blank">@ateliekamayura</a><br>
+	<b>Recomendações:</b> Caso volte a funcionar, é uma visita enriquecedora para quem aprecia arte popular e expressões culturais autênticas da região.`,
+  	"coords": [-7.833011, -34.906740]
+	},
+	{
+  	"nome": "Casarão Rosa Lounge",
+  	"desc": `<b>Endereço:</b> Rua Dr. João Elísio, nº 17 – Sítio Histórico, Igarassu‑PE, CEP 53620‑060<br>
+	<b>Coordenadas:</b> 7.832985 S, 34.906807 W<br>
+	<b>Descrição:</b> O Casarão Rosa Lounge é um espaço multifuncional e charmoso localizado no coração do Sítio Histórico de Igarassu. Com atmosfera acolhedora e arquitetura preservada, abriga diversas lojas e pontos gastronômicos em um só lugar, tornando-se referência em lazer e cultura local.<br>
+	<b>Principais atrativos:</b><br>
+	• <b>Cafeteria:</b> <a href="https://www.instagram.com/donnairenecafe/" target="_blank">@donnairenecafe</a><br>
+	• <b>Restaurante:</b> <a href="https://www.instagram.com/almeidarestaurante4/" target="_blank">@almeidarestaurante4</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/casaraorosalounge/" target="_blank">@casaraorosalounge</a><br>
+	<b>WhatsApp para pedidos:</b> <a href="https://wa.me/5581982607260" target="_blank">(81) 98260‑7260</a><br>
+	<b>Recomendações:</b> Ideal para uma pausa entre visitas aos atrativos históricos, compras em lojas artesanais e encontros culturais num ambiente sofisticado e regional.`,
+  	"coords": [-7.832985, -34.906807]
+	},
+	{
+  	"nome": "Loja Maçônica de Igarassu – Venerável Stelio Marinho Falcão",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, Sítio Histórico – Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832833 S, 34.906434 W<br>
+	<b>Descrição:</b> A Loja Maçônica de Igarassu – Venerável Stelio Marinho Falcão é uma das instituições fraternais mais tradicionais da cidade, reunindo membros da Maçonaria comprometidos com valores de liberdade, igualdade, fraternidade e filantropia. Localizada no centro do Sítio Histórico, desempenha papel relevante nas ações sociais e culturais locais.<br>
+	<b>Funcionamento:</b> Reservado às sessões regulares e atividades internas da Ordem. A visitação externa é restrita e depende de convite ou agendamento específico com membros da Loja.<br>
+	<b>Recomendações:</b> Ponto de interesse para pesquisadores da história maçônica em Pernambuco e para visitantes interessados na arquitetura simbólica e influência cultural da Maçonaria na formação urbana.<br>
+	<b>Observações:</b> A loja homenageia em seu nome o Venerável Stelio Marinho Falcão, figura notável no cenário maçônico e político local.`,
+  	"coords": [-7.832833, -34.906434]
+	},
+	{
+  	"nome": "Grupo Escoteiro Narciso Félix de Araújo – Escoteiros de Igarassu",
+  	"desc": `<b>Endereço:</b> Rua Dr. João Elísio, 33, Sítio Histórico – Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832788 S, 34.907191 W<br>
+	<b>Descrição:</b> Fundado com o objetivo de formar jovens conscientes, solidários e responsáveis, o Grupo Escoteiro Narciso Felix de Araújo desenvolve atividades educativas com base no voluntariado e na vivência ao ar livre. Com atuação destacada na cidade, promove valores como cidadania, respeito à natureza e trabalho em equipe.<br>
+	<b>Atividades:</b> Reuniões semanais com lobinhos, escoteiros, seniores e pioneiros; acampamentos, oficinas de cidadania, ações sociais e eventos em conjunto com a comunidade local.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/escoteirosigarassu_oficial/" target="_blank">@escoteirosigarassu_oficial</a><br>
+	<b>Recomendações:</b> Interessados em ingressar no grupo devem acompanhar as redes sociais ou visitar o local durante os sábados à manhã, quando ocorrem os encontros regulares.<br>
+	<b>Afiliação:</b> Instituo Sempre Alerta - Associação Pernambucana de Escoteiros`,
+  	"coords": [-7.832788, -34.907191]
+	},
+	{
+  	"nome": "Guarda Civil Municipal de Igarassu – A mais antiga do Brasil",
+  	"desc": `<b>Endereço:</b> Rua Dr. João Elísio, Sítio Histórico – Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832639 S, 34.907145 W<br>
+	<b>Descrição:</b> A Guarda Municipal de Igarassu é reconhecida como a mais antiga do Brasil, com sua criação autorizada pela Lei Estadual nº 52 (Art. 10, § 1º) em 03 de agosto de 1892. O efetivo inicial foi estabelecido pela Lei Municipal nº 04, de 05 de agosto de 1892, durante a gestão do primeiro prefeito de Igarassu, o Coronel Luiz Scipião de Albuquerque Maranhão. A formalização ocorreu por meio da Lei do Conselho Municipal nº 06, datada de 22 de janeiro de 1893, tendo como chefe do Executivo Municipal o Comendador João Francisco do Amaral. O primeiro comandante foi o Alferes Antônio Moreira, do Corpo de Polícia do Estado de Pernambuco. O efetivo inicial era composto por 10 praças, 1 cabo e 1 comissário comandante. :contentReference[oaicite:4]{index=4}<br>
+	<b>Atuação:</b> A Guarda Municipal atua diariamente em benefício da população e da cidade, com muito trabalho e dedicação. :contentReference[oaicite:5]{index=5}<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/guardacivildeigarassu/" target="_blank">@guardacivildeigarassu</a><br>
+	<b>Recomendações:</b> Interessados em conhecer mais sobre a história e atuação da Guarda Municipal podem acompanhar as redes sociais ou entrar em contato com a Prefeitura de Igarassu.`,
+  	"coords": [-7.832639, -34.907145]
+	},
+	{
+  	"nome": "Ponte sobre o Rio São Domingos (Ponte de Santo Antônio e São José)",
+  	"desc": `<b>Endereço:</b> Conecta a parte alte a baixa do Sitio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832610 S, 34.907314 W<br>
+	<b>Descrição:</b> Conhecida como Ponte de Santo Antônio e São José, a travessia tem valor simbólico e funcional, pois conecta a parte alta à parte baixa do Sítio Histórico de Igarassu, estabelecendo ligação entre o sitio historico da cidade.<br>
+	<b>Natureza e contemplação:</b> Atravessando o Rio São Domingos, oferece uma vista privilegiada do curso d’água e da paisagem natural ao redor. É comum avistar garças, caranguejos, capivaras e aves aquáticas, compondo um cenário ideal para contemplação e fotografia.<br>
+	<b>Recomendações:</b> Para melhor experiência, recomenda-se atravessar a ponte a pé, nos horários de menor movimentação, aproveitando a brisa e o silêncio do entorno.<br>
+	<b>Categoria:</b> Patrimônio paisagístico e natural urbano – ponto estratégico de observação ecológica e conexão histórica.`,
+  	"coords": [-7.832610, -34.907314]
+	},
+	{
+  	nome: "Centro de Artes e Cultura de Igarassu – Mestre Narciso Félix de Araújo",
+  	desc: `<b>Endereço:</b> Rua Dr. João Elísio, 1149 – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832204 S, 34.908197 W<br>
+	<b>Descrição:</b> Instalado no antigo Mercado Público Municipal, o Centro de Artes e Cultura de Igarassu foi reinaugurado com o nome de Mestre Narciso Félix de Araújo, homenageando o artista plástico e educador cultural que marcou gerações. O edifício abriga um auditório climatizado com poltronas, cabine de som e luz, além de galeria de artes, estúdio de gravação audiovisual e salas para atividades culturais diversas. O entorno, às margens do mangue, foi revitalizado e integra o espaço à paisagem local, criando um ambiente acolhedor e funcional para a cultura e a arte.<br>
+	<b>Funcionamento:</b> Apenas durante <b>eventos culturais</b> ou <b>mediante agendamento</b> com a Secretaria de Patrimônio Histórico, Cultura e Turismo de Igarassu.<br>
+	<b>Email:</b> <a href="mailto:cultura@igarassu.pe.gov.br">cultura@igarassu.pe.gov.br</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/sepacturigarassu/" target="_blank">@sepacturigarassu</a><br>
+	<b>Recomendações:</b> Ideal para oficinas, mostras artísticas, apresentações culturais e visitas educativas integradas à programação oficial do município.<br>
+	<b>Categoria:</b> Espaço Cultural<br>
+	<b>Proteção:</b> Integrante da zona de proteção do Sítio Histórico de Igarassu – Tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.832204, -34.908197]
+	},
+	{
+  	nome: "Associação Ponto Cidadão",
+  	desc: `<b>Endereço:</b> Rua Joaquim Nabuco, 46 – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833000 S, 34.906500 W<br>
+	<b>Descrição:</b> Fundada em 2004, a Associação Ponto Cidadão é uma organização sem fins lucrativos que atua na formação profissional e cidadã de jovens em situação de vulnerabilidade social. Instalada em um casarão histórico restaurado, a instituição oferece cursos e atividades voltadas para a capacitação em áreas administrativas, comportamentais e tecnológicas, preparando os participantes para o mercado de trabalho.<br>
+	<b>Projetos:</b> Entre os principais programas estão o "Passagem para o Futuro" e o "Construindo o Futuro", que proporcionam formação técnica e desenvolvimento pessoal. A associação também promove oficinas de empreendedorismo, orientação vocacional e eventos culturais, como o "Café Jovem Empreendedor" e a "Feira de Empreendedorismo".<br>
+	<b>Resultados:</b> Em 2024, mais de 80% dos jovens formados pela instituição foram inseridos no mercado formal de trabalho, demonstrando o impacto positivo do projeto na comunidade local.<br>
+	<b>Funcionamento:</b> Segunda a sexta-feira, das 7h30 às 17h<br>
+	<b>Contato:</b> <a href="mailto:contato@pontocidadao.org.br">contato@pontocidadao.org.br</a> | <a href="tel:+5581992165051">(81) 99216-5051</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/ponto_cidadao/" target="_blank">@ponto_cidadao</a><br>
+	<b>Recomendações:</b> Ideal para jovens entre 16 e 24 anos que buscam qualificação profissional e desenvolvimento pessoal. Interessados devem acompanhar as redes sociais da instituição para informações sobre processos seletivos e eventos.<br>
+	<b>Categoria:</b> Organização Social / Educação Profissional<br>
+	<b>Proteção:</b> Localizado no Sítio Histórico de Igarassu, área tombada pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.832004, -34.907971]
+	},
+	{
+  	nome: "Banco Santander – Agência 4025 (Igarassu)",
+  	desc: `<b>Endereço:</b> Praça São Sebastião, s/n – Centro, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.831999 S, 34.908620 W<br>
+	<b>Descrição:</b> A Agência 4025 do Banco Santander está localizada no coração do Sítio Histórico de Igarassu, atendendo clientes desde 2009. O espaço passou por modernização para oferecer maior conforto e agilidade no atendimento bancário, mantendo-se integrado ao conjunto arquitetônico da região.<br>
+	<b>Serviços:</b> Atendimento a pessoas físicas e jurídicas, abertura de contas, operações de crédito, investimentos, consignados e serviços diversos.<br>
+	<b>Funcionamento:</b> Segunda a sexta-feira, das 9h às 17h<br>
+	<b>Telefone:</b> <a href="tel:+558135437300">(81) 3543-7300</a><br>
+	<b>Recomendações:</b> A agência é uma opção prática para moradores e visitantes que necessitam de serviços bancários no centro histórico. Recomenda-se verificar a disponibilidade de atendimento presencial ou digital conforme a necessidade.<br>
+	<b>Categoria:</b> Instituição Financeira<br>
+	<b>Proteção:</b> Localizada na área tombada do Sítio Histórico de Igarassu – IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.831999, -34.908620]
+	},
+	{
+  	nome: "Capela de São Sebastião",
+  	desc: `<b>Endereço:</b> Largo de São Sebastião – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.831683 S, 34.908631 W<br>
+	<b>Descrição:</b> Construída em 1735, a Capela de São Sebastião é um dos marcos do barroco colonial em Igarassu. Sua arquitetura apresenta nave e torre únicas, com frontão característicos do estilo maneirista. O interior é simples, com paredes brancas e ausência de ornamentos dourados, refletindo a austeridade dos templos do período.<br>
+	<b>Atividades religiosas:</b> A capela é sede do grupo do <b>Terço dos Homens</b>, que se reúne semanalmente para orações e reflexões. Os encontros ocorrem às sextas-feiras à noite, promovendo a espiritualidade e a união da comunidade masculina local.<br>
+	<b>Visitação:</b> Aberta ao público durante as atividades religiosas e mediante agendamento prévio para visitas turísticas.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/paroquiacosmeedamiaoigarassu/" target="_blank">@paroquiacosmeedamiaoigarassu</a><br>
+	<b>Recomendações:</b> Ideal para interessados em arquitetura religiosa, história colonial e práticas de fé comunitária.<br>
+	<b>Categoria:</b> Patrimônio Religioso<br>
+	<b>Proteção:</b> Tombada pelo IPHAN desde 1951 como parte do conjunto do Sítio Histórico de Igarassu – Decreto-Lei nº 25/1937`,
+  	coords: [-7.831683, -34.908631]
+	},
+	{
+  	nome: "Cartório de Igarassu – Ofício Único",
+  	desc: `<b>Endereço:</b> Rua Joaquim Nabuco, 105 – Centro, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.831433 S, 34.908620 W<br>
+	<b>Descrição:</b> Fundado em 16 de maio de 1933, o Cartório de Igarassu – Ofício Único é responsável por uma ampla gama de serviços notariais e registrais no município. Suas atribuições incluem: Notas, Protesto de Títulos, Registro de Imóveis, Registro de Títulos e Documentos e Registro Civil de Pessoas Jurídicas.<br>
+	<b>Serviços:</b> Entre os principais serviços oferecidos estão escrituras públicas, reconhecimento de firmas, autenticações, registro de imóveis, protesto de títulos, registro de contratos e documentos diversos, além de atos relacionados a pessoas jurídicas.<br>
+	<b>Funcionamento:</b> Segunda a sexta-feira, das 8h às 12h e das 13h30 às 17h30<br>
+	<b>Contato:</b> <a href="mailto:cartorio@cartorioigarassu-pe.com.br">cartorio@cartorioigarassu-pe.com.br</a> | <a href="mailto:cartoriounicoigarassupe-marcos@oi.com.br">cartoriounicoigarassupe-marcos@oi.com.br</a><br>
+	<b>Telefone:</b> <a href="tel:+558135430013">(81) 3543-0013</a> | <a href="tel:+558135430073">(81) 3543-0073</a><br>
+	<b>Responsável:</b> Hélio Guido Castro Santoianni (titular) | Manuel José da Silva Filho (substituto)<br>
+	<b>Recomendações:</b> Ideal para serviços relacionados a transações imobiliárias, registros de documentos e atos notariais. Recomenda-se agendar previamente ou verificar a disponibilidade de atendimento para serviços específicos.<br>
+	<b>Categoria:</b> Cartório de Notas e Registro<br>
+	<b>Proteção:</b> Localizado na área do Sítio Histórico de Igarassu, tombada pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.831433, -34.908620]
+	},
+	{
+  	nome: "Delegacia de Polícia da 29ª Circunscrição – Igarassu",
+  	desc: `<b>Endereço:</b> Rua Severino Uchôa Cavalcante, 63 – Centro, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.831800 S, 34.909251 W<br>
+	<b>Descrição:</b> A Delegacia de Polícia da 29ª Circunscrição é responsável pelo atendimento à população de Igarassu, realizando registros de ocorrências, investigações e ações de segurança pública. A unidade integra a 8ª Delegacia Seccional (DESEC) da Polícia Civil de Pernambuco.<br>
+	<b>Serviços:</b> Registro de boletins de ocorrência, investigações criminais, atendimento ao público e outras atividades relacionadas à segurança pública.<br>
+	<b>Funcionamento:</b> Segunda a sexta-feira, das 8h às 18h<br>
+	<b>Contato:</b> <a href="mailto:dp29circ.igarassu@policiacivil.pe.gov.br">dp29circ.igarassu@policiacivil.pe.gov.br</a><br>
+	<b>Telefone:</b> <a href="tel:+558131843489">(81) 3184-3489</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/delegacia_de_igarassu/" target="_blank">@delegacia_de_igarassu</a><br>
+	<b>Recomendações:</b> Para registros de ocorrências, é possível utilizar o serviço online da Polícia Civil de Pernambuco: <a href="https://servicos.sds.pe.gov.br/delegacia/" target="_blank">servicos.sds.pe.gov.br/delegacia/</a><br>
+	<b>Categoria:</b> Segurança Pública<br>
+	<b>Proteção:</b> Localizada na área do Sítio Histórico de Igarassu, tombada pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.831800, -34.909251]
+	},
+	{
+ 	nome: "Agência dos Correios – AC Igarassu",
+  	desc: `<b>Endereço:</b> Rua Severino Uchôa Cavalcante, s/n – Centro, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.831667 S, 34.909409 W<br>
+	<b>Descrição:</b> A Agência dos Correios de Igarassu (AC Igarassu) é a principal unidade de atendimento postal da cidade, oferecendo serviços como envio e recebimento de correspondências e encomendas, serviços bancários via Banco Postal, aluguel de caixas postais, venda de selos e produtos filatélicos, além de atendimento a serviços do INSS.<br>
+	<b>Funcionamento:</b><br>
+	• Segunda a sexta-feira: 08h às 12h e 13h30 às 16h<br>
+	• Sábado: 08h às 12h<br>
+	<b>Contato:</b> <a href="tel:+558135430049">(81) 3543-0049</a><br>
+	<b>CEP:</b> 53610-970<br>
+	<b>Recomendações:</b> Ideal para envio de correspondências, encomendas, serviços bancários e atendimento a serviços do INSS. Recomenda-se verificar previamente os horários de funcionamento e a disponibilidade dos serviços desejados.<br>
+	<b>Categoria:</b> Serviços Postais<br>
+	<b>Proteção:</b> Localizada na área do Sítio Histórico de Igarassu, tombada pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.831667, -34.909409]
+	},
+	{
+  	nome: "Cartório Eleitoral de Igarassu – 85ª Zona Eleitoral",
+  	desc: `<b>Endereço:</b> Rua Joaquim Nabuco, s/n – Centro, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.830537 S, 34.908435 W<br>
+	<b>Descrição:</b> A 85ª Zona Eleitoral de Igarassu é responsável pelos serviços eleitorais do município, incluindo alistamento, transferência, revisão de dados cadastrais e emissão de títulos eleitorais. A unidade também coordena as eleições locais e presta atendimento ao eleitor.<br>
+	<b>Funcionamento:</b> Segunda a sexta-feira, das 8h às 14h<br>
+	<b>Contato:</b> <a href="tel:+558131949085">(81) 3194-9085</a><br>
+	<b>Atendimento remoto:</b> Disponível via Balcão Virtual pelo WhatsApp, sem necessidade de agendamento prévio. Os serviços incluem atendimento por texto, vídeo ou voz, facilitando o acesso do eleitor aos serviços oferecidos.<br>
+	<b>Recomendações:</b> Para serviços presenciais, recomenda-se verificar previamente a necessidade de agendamento. Para atendimento remoto, utilize o Balcão Virtual disponível no site do TRE-PE.<br>
+	<b>Categoria:</b> Serviços Eleitorais<br>
+	<b>Proteção:</b> Localizado na área do Sítio Histórico de Igarassu, tombada pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.830537, -34.908435]
+	},
+	{
+  	nome: "Boulevard Gastronômico de Rua do Sitio Historico de Igarassu",
+  	desc: `<b>Endereço:</b> Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834313 S, 34.906193 W<br>
+	<b>Descrição:</b> Espaço urbano consolidado para a comercialização de lanches e refeições rápidas, o Boulevard Gastronômico é formado por barracas, trailers e food trucks dispostos de forma regulamentada, com identidade visual padronizada e acompanhamento da Secretaria Executiva de Patrimônio Histórico, Cultura e Turismo. Integra a dinâmica cultural do Sítio Histórico, conectando gastronomia popular e vivência patrimonial.<br>
+	<b>Funcionamento:</b> Diariamente, com maior movimento no fim de tarde e à noite, especialmente nos finais de semana e durante eventos religiosos e culturais<br>
+	<b>Recomendações:</b> Ideal para visitantes que desejam conhecer a culinária popular local em um ambiente democrático, seguro e integrado ao circuito histórico<br>
+	<b>Categoria:</b> Rota Gastronômica Popular<br>
+	<b>Proteção:</b> Localizado na área do Sítio Histórico de Igarassu, tombada pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.834356, -34.906118]
+	}
+      ],
+      historica: [
+	{nome: "Ruína da Igreja de Nossa Senhora do Rosário dos Homens Pretos",desc: "<b>Endereço:</b> Rua Carlos Paes Barretto, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8364 S, 34.9084 W<br><b>Horário:</b> Não há visitação pública<br><b>Entrada:</b> Observação externa<br><b>Estacionamento:</b> Via pública em frente ao local<br><b>Descrição:</b> Ruínas da Igreja de Nossa Senhora do Rosário dos Homens Pretos. Já existia em 1701, com parte da parede lateral norte ainda de pé. Construída e mantida pela confraria de homens negros livres, com a curiosa exceção de que o tesoureiro deveria ser \"branco, de boa aparência e honesto\".<br><b>Serviços:</b> —<br><b>Recomendações:</b> Visitação apenas externa; respeitar limites de propriedade privada<br><b>Proteção:</b> FUNDARPE – Lei nº 7.970/1979; IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.836442, -34.908446]},
+	{nome: "Ruínas da Misericórdia", desc: "<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8357 S, 34.9071 W<br><b>Horário:</b> Visitação externa livre <br><b>Acessibilidade:</b> Rampas e Calçamento em piso intertravado<br><b>Estacionamento:</b> Vagas públicas nas ruas adjacentes<br><b>Descrição:</b> Vestígios arquitetônicos do antigo conjunto da Igreja e Hospital da Santa Casa de Misericórdia de Igarassu, datado do século XVI. É um dos testemunhos mais antigos da presença portuguesa no Brasil e da atuação das ordens religiosas no cuidado à saúde e à fé. Sua preservação contribui para a compreensão do passado colonial e da história da assistência social no país.<br><b>Recomendações:</b> Não ultrapassar as delimitações de segurança; ideal para observação e fotografia histórica<br><b>Proteção:</b> Tombamento federal pelo IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.835738, -34.907167]},
+        {nome: "Sobrado do Imperador / Casa do Patrimônio do IPHAN", desc: "<b>Endereço:</b> Rua Barbosa Lima, s/n, Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8347 S, 34.9066 W<br><b>Telefone:</b> (81) 3545‑1223<br><b>E‑mail:</b> iphan.igarassu@iphan.gov.br<br><b>Horário:</b> Segunda a sexta, das 8h às 12h e de 13h as 17h<br><b>Entrada:</b> Gratuita (visitação guiada mediante agendamento prévio)<br><b>Acessibilidade:</b> Parcial, térreo acessível<br><b>Estacionamento:</b> Vagas públicas em frente<br><b>Descrição:</b> Importante edificação colonial do século XVIII, o sobrado abriga a Casa do Patrimônio do IPHAN em Igarassu. É conhecido como “Sobrado do Imperador” pela tradição oral que associa o local à hospedagem de Dom Pedro II. Atualmente, funciona como centro de referência para ações de preservação, educação patrimonial e atendimento técnico.<br><b>Serviços:</b> Atendimento técnico do IPHAN, orientações sobre tombamento, projetos educativos e exposições temporárias<br><b>Recomendações:</b> Agendar visitas institucionais com antecedência<br><b>Proteção:</b> Edificação tombada pelo IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.834744, -34.906665]},	
+	{nome: "Casa de Câmara e Cadeia", desc: `<b>Endereço:</b> Rua Capitão Afonso Gonçalves, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8352 S, 34.9062 W<br><b>Descrição:</b> A Casa de Câmara e Cadeia de Igarassu passou por quatro sedes históricas. A primeira foi destruída no século XVII. A segunda, construída após 1675, destacava-se pelo porte e localização. A terceira funcionou no atual Sobrado do Imperador, onde D. Pedro II esteve em 1859. A sede atual, adaptada no fim do século XIX, abriga hoje a Câmara Municipal.<br><b>Visitação:</b> Pode-se acompanhar as sessões <br><b>Instagram:</b> <a href="https://www.instagram.com/camaradeigarassu/" target="_blank">@camaradeigarassu</a><br><b>Recomendações:</b> Visita guiada com foco em história e cidadania<br><b>Proteção:</b> Inserida na área tombada pelo IPHAN – Decreto-Lei nº 25/1937`, coords: [-7.835259, -34.906287]},
+	{nome: "Réplica do Marco de Pedra", desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8352 S, 34.9061 W<br><b>Descrição:</b> Réplica do marco de pedra que delimitava as capitanias de Igarassu e Itamaracá no período colonial. O original ficava no Sítio dos Marcos, nas proximidades do Canal de Santa Cruz, sendo referência geográfica e política do início da colonização portuguesa no Brasil.<br><b>Recomendações:</b> Ideal para fotografias e interpretação histórica<br><b>Proteção:</b> Inserida na ambiência protegida do Sítio Histórico pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.835241, -34.906110]},
+	{nome: "Recolhimento do Sagrado Coração de Jesus", desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br> <b>Coordenadas:</b> 7.8344 S, 34.9065 W<br><b>Descrição:</b> Fundado em 1º de março de 1742 pelos padres Miguel Rodrigues Sepúlvida e Gabriel Malagrida, o Recolhimento tinha como missão amparar e educar a juventude feminina, oferecendo assistência espiritual e formação religiosa as quais duram até os dias atuais.<br><b>Instagram:</b> <a href="https://www.instagram.com/oscjconventoigarassu/" target="_blank">@oscjconventoigarassu</a><br><b>Recomendações:</b> Verificar taxa para visitação. Visitação com sensibilidade ao ambiente religioso<br><b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico de Igarassu pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.834489, -34.906512]},
+	{nome: "Convento Franciscano de Igarassu", desc: `<b>Endereço:</b> Sítio Histórico, Igarassu‑PE<br> <b>Coordenadas:</b> 7.832554 S, 34.904801 W<br> <b>Descrição:</b> Fundado em 1588 pelos frades da Ordem Franciscana (OFM), foi o terceiro convento franciscano do Brasil. Durante a ocupação holandesa (1630–1654), foi saqueado e abandonado, sendo reconstruído a partir de 1661 e concluído em 1693. No século XVIII recebeu decoração barroca, com azulejos, talha dourada e pintura em teto; abriga hoje 3 instituições importantes: o Museu Pinacoteca de Igarassu, o Seminitário Prepedeutico e a Sede do Vicariato.<br><b>Arquitetura:</b> Barroco franciscano nordestino, com galilé de três arcos, torre sineira, cruzeiro no adro e interiores revestidos de azulejos do séc. XVII–XVIII.<br><b>Museu Pinacoteca:</b> No interior, apresenta painéis e pinturas de arte sacra colonial (séc. XVII–XVIII) e elementos litúrgicos.<br> <b>Acesso:</b> Visitação guiada disponível; acesso ao claustro e museu.<br><b>Recomendações:</b> Ideal para estudos de arquitetura barroca, restauração e história colonial.<br><b>Proteção:</b> Tombado federalmente pelo IPHAN – Livro do Tombo nº 131, desde 17‑05‑1938; parte do Centro Histórico protegido desde 1972.`, coords: [-7.832554, -34.904801]},        
+	{nome: "Ruína da Capela da Ordem Terceira de Igarassu",
+  	desc: `<b>Endereço:</b> Ao lado do Convento Franciscano – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832440 S, 34.905303 W<br>
+	<b>Descrição:</b> Remanescente da Capela da Ordem Terceira de São Francisco, construída no século XVII pelos irmãos terceiros da cidade. Após danos estruturais e abandono progressivo, restam apenas parte das paredes e fundações, que testemunham a presença leiga franciscana e sua influência cultural e religiosa.<br>
+	<b>Recomendações:</b> Visitação externa, ideal para registros fotográficos e roteiros históricos.<br>
+	<b>Proteção:</b> Inserida na ambiência protegida do Sítio Histórico de Igarassu – IPHAN – Decreto‑Lei nº 25/1937`,
+  	coords: [-7.832440, -34.905303]
+	},
+	{nome: "Igreja dos Santos Cosme e Damião", desc: `<b>Endereço:</b> Praça da Matriz, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8339 S, 34.9061 W<br><b>Descrição:</b> Reconhecida pelo IPHAN como a <b>igreja mais antiga do Brasil em funcionamento</b>, a Igreja dos Santos Cosme e Damião foi erguida a partir de 1535. A estrutura original de taipa ruiu por volta de 1590, sendo substituída por uma construção em pedra e cal entre 1595 e 1597, mediante alvará real.<br> Ampliada no século XVIII com recursos da Coroa, teve sua importância reafirmada por estudiosos como o Prof. C. Smith, da Universidade da Pensilvânia. Em 1958, passou por restauração, recuperando características maneiristas originais.<br><b>Estilo:</b> Maneirista<br><b>Horário de visitação:</b><br>• Segunda: 9h às 15h<br>• Terça a sexta: 9h às 17h<br>• Sábado e domingo: 9h às 13h<br><b>Missas:</b><br>• Quinta: 19h<br>• Domingo: 7h e 19h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Parcial – com rampas laterais e nave central livre<br><b>Serviços:</b> Missas dominicais, visitas guiadas<br><b>Estacionamento:</b> Na rua lateral da igreja<br><b>Instagram:</b> <a href="https://www.instagram.com/paroquiacosmeedamiaoigarassu/" target="_blank">@paroquiacosmeedamiaoigarassu</a><br><b>Proteção:</b> Tombamento federal pelo IPHAN – Decreto‑Lei nº 25/1937<br><b>Recomendações:</b> Visitação respeitosa, ideal para estudos de arquitetura sacra, turismo histórico e momentos de espiritualidade.`, coords: [-7.833936, -34.906166]},
+	{
+  	nome: "Capela de Nossa Senhora do Livramento",
+  	desc: `<b>Endereço:</b> Praça da Bandeira, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833165 S, 34.906660 W<br>
+	<b>Descrição:</b> De origem incerta, a Capela de Nossa Senhora do Livramento é tradicionalmente atribuída ao terceiro quartel do século XVIII. A data inscrita em sua fachada, 1774, corresponde a uma importante reforma e ampliação, e não à sua construção original. Estudos de restauro revelaram que a estrutura inicial era de pedra e cal, com nave de menores proporções e sacristia sem piso superior.<br>
+	Em 1782, segundo o II Livro de Tombo da vila de Igarassu, a irmandade já estava oficialmente constituída, sob a presidência do Sr. Joaquim Rodrigues da Costa Queimado. Após o desabamento do teto em 1958, a capela foi restaurada em 1972 e novamente em 1986. Apresenta características do estilo barroco, com elementos arquitetônicos preservados graças aos esforços de conservação.<br>
+	<b>Visitação:</b> Apenas mediante <b>agendamento prévio</b> junto à Secretaria Executiva de Patrimônio Histórico<br>
+	<b>Email para agendamento:</b> <a href="mailto:patrimoniohistorico@igarassu.pe.gov.br">patrimoniohistorico@igarassu.pe.gov.br</a><br>
+	<b>Recomendações:</b> Ideal para pesquisadores, estudiosos de arte sacra e visitantes interessados no patrimônio religioso barroco<br>
+	<b>Proteção:</b> Integrante do Sítio Histórico de Igarassu, tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.833165, -34.906660]
+	},
+	{
+  	nome: "Capela de São Sebastião",
+  	desc: `<b>Endereço:</b> Largo de São Sebastião – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.831683 S, 34.908631 W<br>
+	<b>Descrição:</b> Construída em 1735, a Capela de São Sebastião é um dos marcos do barroco colonial em Igarassu. Sua arquitetura apresenta nave e torre únicas, com frontão característicos do estilo maneirista. O interior é simples, com paredes brancas e ausência de ornamentos dourados, refletindo a austeridade dos templos do período.<br>
+	<b>Atividades religiosas:</b> A capela é sede do grupo do <b>Terço dos Homens</b>, que se reúne semanalmente para orações e reflexões. Os encontros ocorrem às sextas-feiras à noite, promovendo a espiritualidade e a união da comunidade masculina local.<br>
+	<b>Visitação:</b> Aberta ao público durante as atividades religiosas e mediante agendamento prévio para visitas turísticas.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/paroquiacosmeedamiaoigarassu/" target="_blank">@paroquiacosmeedamiaoigarassu</a><br>
+	<b>Recomendações:</b> Ideal para interessados em arquitetura religiosa, história colonial e práticas de fé comunitária.<br>
+	<b>Categoria:</b> Patrimônio Religioso<br>
+	<b>Proteção:</b> Tombada pelo IPHAN desde 1951 como parte do conjunto do Sítio Histórico de Igarassu – Decreto-Lei nº 25/1937`,
+  	coords: [-7.831683, -34.908631]
+	},
+	{
+  	"nome": "Ponte sobre o Rio São Domingos (Ponte de Santo Antônio e São José)",
+  	"desc": `<b>Endereço:</b> Conecta a parte alte a baixa do Sitio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832610 S, 34.907314 W<br>
+	<b>Descrição:</b> Conhecida como Ponte de Santo Antônio e São José, a travessia tem valor simbólico e funcional, pois conecta a parte alta à parte baixa do Sítio Histórico de Igarassu, estabelecendo ligação entre o sitio historico da cidade.<br>
+	<b>Natureza e contemplação:</b> Atravessando o Rio São Domingos, oferece uma vista privilegiada do curso d’água e da paisagem natural ao redor. É comum avistar garças, caranguejos, capivaras e aves aquáticas, compondo um cenário ideal para contemplação e fotografia.<br>
+	<b>Recomendações:</b> Para melhor experiência, recomenda-se atravessar a ponte a pé, nos horários de menor movimentação, aproveitando a brisa e o silêncio do entorno.<br>
+	<b>Categoria:</b> Patrimônio paisagístico e natural urbano – ponto estratégico de observação ecológica e conexão histórica.`,
+  	"coords": [-7.832610, -34.907314]
+	}
+	],
+     museus: [
+        {nome: "Museu Histórico de Igarassu", desc: "<b>Descrição:</b> Fundado em 24 de janeiro de 1954 pelo Dr. José Eduardo da Silva Brito – então presidente do Instituto Histórico de Igarassu. Em janeiro de 1972, não tendo como manter o acervo, o Instituto Histórico doou para Prefeitura Municipal de Igarassu todo seu acervo e patrimônio que, atualmente, ocupa três casas do século XVIII. Seu acervo é composto por 560 peças das quais 266 estão em exposição. O Museu possui também, um Departamento de Pesquisa Histórica, responsável pela guarda de importantes documentos da história de nossa cidade. Destaque para as exposições de peças sacras, armas e numismática.<br><b>Email:</b> museuhistorico@igarassu.pe.gov.br<br><b>Instagram:</b> <a href='https://instagram.com/mhigarassu' target='_blank'>@mhigarassu</a><br><b>Acessibilidade:</b> Sim, com rampas de acesso laterais e banheiro acessível.", coords: [-7.834053, -34.906354]},
+        {nome: "Museu da Igreja dos Santos Cosme e Damião", desc: `<b>Endereço:</b> Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8336 S, 34.9060 W<br><b>Descrição:</b> Localizado no primeiro andar da Casa Paroquial, o museu foi inaugurado em 2022 após cuidadosa reforma interna. O acesso é feito pela sacristia da Igreja dos Santos Cosme e Damião. O acervo reúne objetos litúrgicos, imagens sacras e registros da historia religiosa em torno dos Santos Cosme e Damião.<br>Em dias de missa, funciona tambem um espaço de café anexo ao museu, que oferece pratos e quitutes preparados pelos seminaristas e por grupos da paróquia.<br><b>Horário de funcionamento:</b> Mesmo da igreja:<br>• Segunda: 9h às 15h<br>• Terça a sexta: 9h às 17h<br>• Sábado e domingo: 9h às 13h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Parcial, com rampas e baheiro acessivel<br><b>Instagram:</b> <a href="https://www.instagram.com/museu_scd" target="_blank">@museu_scd</a><br><b>Recomendações:</b> Visitação guiada mediante agendamento. Ideal para estudantes, peregrinos e interessados em história e cultura religiosa.<br><b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico de Igarassu – IPHAN – Decreto-Lei nº 25/1937`, coords: [-7.833646, -34.906005]},
+	{nome: "Museu Pinacoteca de Igarassu",
+ 	desc: `<b>Endereço:</b> Rua Dantas Barreto, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.83254 S, 34.90462 W<br>
+	<b>Descrição:</b> Instalado no antigo dormitório dos noviços do Convento Franciscano (1705), o museu foi criado em 1957 e abriga uma coleção de cerca de 25 painéis e pinturas sacras dos séculos XVII e XVIII, além de elementos litúrgicos, provenientes da Sé de Olinda, da Igreja dos Santos Cosme e Damião e do próprio convento. <br>
+	<b>Horário de funcionamento:</b><br>
+	• Segunda a sexta: 9h às 17h<br>
+	• Sábado e domingo: mediante agendamento prévio<br>
+	<b>Ingresso:</b><br>
+	• Inteira: R$ 5,00<br>
+	• Meia: R$ 2,50<br>
+	• Gratuito para escolas públicas agendadas<br>
+	<b>Contato:</b> WhatsApp: <a href="https://wa.me/5581981751463" target="_blank">(81) 98175-1463</a><br>
+	<b>Serviços:</b> Visitas guiadas<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/muspi.igarassu/" target="_blank">@muspi.igarassu</a><br>
+	<b>Recomendações:</b> Ideal para quem estuda arte sacra colonial e história religiosa; visitar com calma para contemplar painéis do século XVII–XVIII<br>
+	<b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico de Igarassu pelo IPHAN – Decreto‑Lei nº 25/1937`,
+ 	coords: [-7.832538, -34.904616]
+	}
+      ],
+      cultural: [
+        {nome: "Maracatu Estrela Brilhante de Igarassu", desc: "<b>Endereço:</b> Rua do Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8360 S, 34.9078 W<br><b>Horário:</b> Ensaios e apresentações em datas culturais e religiosas<br><b>Estacionamento:</b> Via pública nas imediações<br><b>Descrição:</b> Fundado em 1824 é um dos maracatus mais tradicionais do Brasil. Representa a força da memória afro-brasileira e mantém viva a tradição do maracatu de baque virado com fantasias ricas, batuques intensos e cortejo real.<br><b>Serviços:</b> Oficinas, apresentações públicas, participação em eventos e cortejos<br><b>Recomendações:</b> Respeitar os rituais e tradições durante as apresentações<br><b>Instagram:</b> <a href='https://www.instagram.com/estrelabrilhantedeigarassu/' target='_blank'>@estrelabrilhantedeigarassu</a><br><b>Proteção:</b> Patrimônio Vivo de Pernambuco<br>", coords: [-7.836056, -34.907875]},
+        {nome: "Casa de Mestre", desc: "<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8359 S, 34.9077 W<br><b>Telefone:</b> —<br><b>E‑mail:</b> —<br><b>Estacionamento:</b> Vagas públicas na em frente<br><b>Descrição:</b> Espaço cultural que preserva, celebra e promove os saberes tradicionais dos mestres da cultura popular de Igarassu.<br><b>Recomendações:</b> Participar com respeito às expressões culturais locais; verificar a programação atualizada<br><b>Instagram:</b> <a href='https://www.instagram.com/casademestreoficial' target='_blank'>@casademestreoficial</a><br>", coords: [-7.835905, -34.907695]},
+        {nome: "Banda Marcial Heitor Villa-Lobos", desc: "<b>Endereço:</b> Rua Barbosa Lima, nº 144 – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8350 S, 34.9068 W<br><b>Horário:</b> Ensaios em dias alternados e apresentações públicas<br><b>Estacionamento:</b> Vagas públicas nas imediações<br><b>Descrição:</b> Reconhecida nacionalmente, a Banda Marcial Heitor Villa-Lobos é motivo de orgulho para Igarassu. Campeã de diversos concursos estaduais e interestaduais, destaca-se pela disciplina, harmonia e pelo espetáculo visual e sonoro de suas apresentações.<br><b>Serviços:</b> Ensaios abertos, apresentações cívicas e culturais, oficinas para jovens músicos<br><b>Recomendações:</b> Comparecer com antecedência nos eventos públicos para melhor visualização<br><b>Instagram:</b> <a href='https://www.instagram.com/bandamarcialheitorvillalobos/' target='_blank'>@bandamarcialheitorvillalobos</a><br>", coords: [-7.834962, -34.906866]},
+	{nome: "Casa do Artesão de Igarassu", desc: "<b>Endereço:</b> Rua Barbosa Lima, 144, – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8348 S, 34.9067 W<br><b>Horário:</b> Segunda a sábado, das 8h às 15h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Total – acesso frontal com rampa e área de circulação livre<br><b>Estacionamento:</b> Vagas públicas em frente<br><b>Descrição:</b> Espaço dedicado à valorização e comercialização do artesanato tradicional de Igarassu. A Casa do Artesão reúne peças produzidas por artistas locais que mantêm viva a cultura popular do município. Também realiza exposições temáticas e ações educativas.<br><b>Serviços:</b> Venda de artesanato, exposições, ações culturais e oficinas<br><b>Recomendações:</b> Valorize o trabalho local e pergunte sobre a história de cada peça<br><b>Instagram:</b> <a href='https://www.instagram.com/casadoartesaoigarassu' target='_blank'>@casadoartesaoigarassu</a><br>", coords: [-7.834818, -34.906716]},
+	{
+  	nome: "Espaço Cultural Vovôzito",
+  	desc: `<b>Endereço:</b> Avenida Marechal Hermes, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834653 S, 34.905474 W<br>
+	<b>Descrição:</b> Fundado em 2013 pelo bonequeiro Antero Assis, o Espaço Cultural Vovôzito é um núcleo criativo dedicado à pesquisa, formação, produção e fruição das artes cênicas com foco em teatro de bonecos. Localizado no coração do Sítio Histórico de Igarassu, abriga um acervo com mais de 100 bonecos de diversas técnicas: mamulengos, marionetes, ventríloquos, bonecos de balcão, gigantes, de espuma e outros.<br>
+	O espaço promove oficinas, ciclos de debates, espetáculos e visitas guiadas, sendo reconhecido como ponto de encontro de artistas, educadores, ONGs, escolas e turistas do Brasil e do mundo. Entre seus destaques está o <b>Festival de Teatro de Bonecos de Igarassu</b>, que oferece espetáculos gratuitos à comunidade e fomenta a cultura popular nordestina.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/espacoculturalvovozitooficial/" target="_blank">@espacoculturalvovozitooficial</a><br>
+	<b>Recomendações:</b> Ideal para estudantes, artistas e amantes da cultura popular; agende visitas para grupos escolares e culturais.<br>
+	<b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico de Igarassu pelo IPHAN – Decreto‑Lei nº 25/1937`,
+  	coords: [-7.834653, -34.905474]
+	},
+	{
+  	nome: "Truká Espaço Cultural",
+  	desc: `<b>Endereço:</b> Avenida Marechal Hermes, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834749 S, 34.905480 W<br>
+	<b>Descrição:</b> O Truká Espaço Cultural é um polo multicultural independente que fomenta arte, cultura e economia criativa em Igarassu. Atuando como um centro de formação e expressão, promove atividades contínuas voltadas à comunidade local e visitantes.<br>
+	<b>Atividades e serviços:</b><br>
+	📍 Eventos culturais<br>
+	📍 Feira colaborativa de economia solidária<br>
+	📍 Oficinas de arte e criação<br>
+	📍 Luthieria e experimentações musicais<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/espacotruka/" target="_blank">@espacotruka</a><br>
+	<b>WhatsApp:</b> <a href="https://wa.me/5581995643283" target="_blank">(81) 99564-3283</a><br>
+	<b>Recomendações:</b> Ideal para quem busca vivências artísticas, intercâmbio cultural e ações comunitárias no Sítio Histórico de Igarassu.<br>
+	<b>Proteção:</b> Situado na área de influência direta do Sítio Histórico tombado pelo IPHAN – Decreto‑Lei nº 25/1937`,
+  	coords: [-7.834749, -34.905480]
+	},
+	{
+  	nome: "Paranã Puka – Cozinha Cultural",
+  	desc: `<b>Endereço:</b> Avenida Marechal Hermes, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834824 S, 34.905480 W<br>
+	<b>Descrição:</b> O Paranã Puka é um espaço gastronômico e cultural que oferece muito mais que alimentação: promove encontros, sabores e tradições em pleno coração do Sítio Histórico de Igarassu. Com culinária afetiva e ambiente acolhedor, o espaço também sedia apresentações artísticas e colabora com os movimentos culturais da cidade.<br>
+	<b>Horário de funcionamento:</b><br>
+	• Segunda, terça e quarta: 11h30 às 16h<br>
+	• Quinta, sexta e sábado: 11h30 às 23h<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/parana_puka/" target="_blank">@parana_puka</a><br>
+	<b>WhatsApp:</b> <a href="https://wa.me/5581982981283" target="_blank">(81) 98298-1283</a><br>
+	<b>Recomendações:</b> Ideal para quem deseja vivenciar a culinária local com toque artístico, experimentar pratos autorais e curtir eventos em um ambiente autêntico.<br>
+	<b>Proteção:</b> Localizado na ambiência do Sítio Histórico tombado pelo IPHAN – Decreto‑Lei nº 25/1937`,
+ 	 coords: [-7.834824, -34.905480]
+	},
+	{
+ 	 "nome": "Instituto Histórico e Geográfico de Igarassu",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833516 S, 34.906528 W<br>
+	<b>Descrição:</b> Fundado em 23 de maio de 1953, o Instituto Histórico e Geográfico de Igarassu (IHGI) é uma das instituições culturais mais antigas de Pernambuco, dedicada à preservação e estudo da história local. Após um período de inatividade, foi reativado em 1998 por um grupo de cidadãos comprometidos com a memória da cidade. Desde então, o IHGI tem promovido eventos culturais, palestras e publicações que valorizam o patrimônio histórico de Igarassu.<br>
+	<b>Visitação:</b> Aberto ao público apenas durante eventos ou mediante agendamento prévio.<br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/instituto.historico.igarassu/' target='_blank'>@instituto.historico.igarassu</a><br>`,
+  	"coords": [-7.833516, -34.906528]
+	},
+	{
+ 	"nome": "Academia Igarassuense de Cultura e Letras",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833482 S, 34.906485 W<br>
+	<b>Descrição:</b> Fundada com o propósito de promover e preservar a cultura e a literatura local, a Academia Igarassuense de Cultura e Letras realiza diversas atividades culturais, como saraus, concursos literários e eventos educativos. Destacam-se iniciativas como o projeto "Poesia na Praça", que visa aproximar a literatura da comunidade, especialmente dos jovens estudantes. A instituição também é responsável pela organização do concurso "Igarassu em Cores, Versos e Prosas", incentivando a produção literária entre os alunos das escolas locais. As visitas à sede são realizadas apenas durante eventos ou mediante agendamento prévio.<br>
+	<b>Contato:</b> academia.letras.igarassu@bol.com.br<br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/academiaigarassuense/' target='_blank'>@academiaigarassuense</a><br>`,
+  	"coords": [-7.833482, -34.906485]
+	},
+	{
+ 	"nome": "Bloco Lírico Verde Linho",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833452 S, 34.906429 W<br>
+	<b>Descrição:</b> Fundado em setembro de 2019, o Bloco Lírico Verde Linho é a primeira agremiação lírica do município de Igarassu. Inspirado na tradição do frevo de bloco, o grupo resgata a elegância dos antigos carnavais de Pernambuco por meio de fantasias refinadas, estandarte bordado e uma orquestra de pau e corda que executa marchinhas e frevos líricos.<br>
+	<b>Atividades:</b> Participa ativamente do calendário carnavalesco com desfiles, ensaios abertos, acertos de marcha e eventos culturais no Sítio Histórico. É reconhecido por valorizar a música tradicional e fortalecer a identidade cultural igarassuense.<br>
+	<b>Visitação:</b> Sede aberta ao público apenas durante eventos ou mediante <b>agendamento prévio</b>.<br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/verde.linho/' target='_blank'>@verde.linho</a><br>
+	<b>Recomendações:</b> Ideal para visitantes que desejam vivenciar a cultura do frevo lírico, registrar belos momentos fotográficos e conhecer uma das manifestações mais autênticas da cidade.`,
+  	"coords": [-7.833452, -34.906429]
+	},
+	{
+  	"nome": "Grupo Escoteiro Narciso Félix de Araújo – Escoteiros de Igarassu",
+  	"desc": `<b>Endereço:</b> Rua Dr. João Elísio, 33, Sítio Histórico – Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832788 S, 34.907191 W<br>
+	<b>Descrição:</b> Fundado com o objetivo de formar jovens conscientes, solidários e responsáveis, o Grupo Escoteiro Narciso Felix de Araújo desenvolve atividades educativas com base no voluntariado e na vivência ao ar livre. Com atuação destacada na cidade, promove valores como cidadania, respeito à natureza e trabalho em equipe.<br>
+	<b>Atividades:</b> Reuniões semanais com lobinhos, escoteiros, seniores e pioneiros; acampamentos, oficinas de cidadania, ações sociais e eventos em conjunto com a comunidade local.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/escoteirosigarassu_oficial/" target="_blank">@escoteirosigarassu_oficial</a><br>
+	<b>Recomendações:</b> Interessados em ingressar no grupo devem acompanhar as redes sociais ou visitar o local durante os sábados à manhã, quando ocorrem os encontros regulares.<br>
+	<b>Afiliação:</b> Instituo Sempre Alerta - Associação Pernambucana de Escoteiros`,
+  	"coords": [-7.832788, -34.907191]
+	},
+	{
+  	nome: "Centro de Artes e Cultura de Igarassu – Mestre Narciso Félix de Araújo",
+  	desc: `<b>Endereço:</b> Rua Dr. João Elísio, 1149 – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832204 S, 34.908197 W<br>
+	<b>Descrição:</b> Instalado no antigo Mercado Público Municipal, o Centro de Artes e Cultura de Igarassu foi reinaugurado com o nome de Mestre Narciso Félix de Araújo, homenageando o artista plástico e educador cultural que marcou gerações. O edifício abriga um auditório climatizado com poltronas, cabine de som e luz, além de galeria de artes, estúdio de gravação audiovisual e salas para atividades culturais diversas. O entorno, às margens do mangue, foi revitalizado e integra o espaço à paisagem local, criando um ambiente acolhedor e funcional para a cultura e a arte.<br>
+	<b>Funcionamento:</b> Apenas durante <b>eventos culturais</b> ou <b>mediante agendamento</b> com a Secretaria de Patrimônio Histórico, Cultura e Turismo de Igarassu.<br>
+	<b>Email:</b> <a href="mailto:cultura@igarassu.pe.gov.br">cultura@igarassu.pe.gov.br</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/sepacturigarassu/" target="_blank">@sepacturigarassu</a><br>
+	<b>Recomendações:</b> Ideal para oficinas, mostras artísticas, apresentações culturais e visitas educativas integradas à programação oficial do município.<br>
+	<b>Categoria:</b> Espaço Cultural<br>
+	<b>Proteção:</b> Integrante da zona de proteção do Sítio Histórico de Igarassu – Tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.832204, -34.908197]
+	},
+	{nome: "Biblioteca Pública Municipal", desc: `<b>Endereço:</b> Rua Frei Caneca, 24 – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8347 S, 34.9068 W<br><b>Descrição:</b> Instalada em edifício de valor histórico no Sítio Histórico de Igarassu, a Biblioteca Pública Municipal é um importante espaço de leitura, pesquisa e formação cidadã. Seu acervo contempla literatura, história local, obras infantis e material de apoio escolar. O equipamento também promove contação de histórias, oficinas, rodas de leitura e eventos educativos voltados à valorização da cultura e à democratização do acesso ao conhecimento.<br><b>Horário de funcionamento:</b> Segunda a sexta, das 7h30 às 17h<br><b>Instagram:</b> <a href="https://www.instagram.com/bibliotecapmigarassu/" target="_blank">@bibliotecapmigarassu</a><br><b>Acessibilidade:</b> Parcial – entrada com rampa<br><b>Recomendações:</b> Visitação recomendada para estudantes, educadores, pesquisadores e famílias<br><b>Proteção:</b> Inserida na ambiência do Sítio Histórico de Igarassu, tombado pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.833351, -34.905834]},
+	{
+  	"nome": "Ateliê Kamayurá",
+  	"desc": `<b>Endereço:</b> Rua Dr. José Elísio, 9 – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833011 S, 34.906740 W<br>
+	<b>Descrição:</b> Fundado pelo artista plástico Edson Bezerra, o Ateliê Kamayurá foi um espaço cultural de destaque no Sítio Histórico de Igarassu, dedicado à arte indígena, oficinas de grafite, exposições artísticas e ações educativas.<br>
+	<b>Situação atual:</b> <span style="color:red;"><b>Fechado temporariamente</b></span> em virtude do falecimento do fundador. Recomenda-se verificar com os herdeiros ou órgãos culturais municipais sobre eventual reabertura ou continuidade das atividades.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/ateliekamayura/" target="_blank">@ateliekamayura</a><br>
+	<b>Recomendações:</b> Caso volte a funcionar, é uma visita enriquecedora para quem aprecia arte popular e expressões culturais autênticas da região.`,
+  	"coords": [-7.833011, -34.906740]
+	},
+
+      ],
+      igrejas: [
+        {nome: "Igreja dos Santos Cosme e Damião", desc: `<b>Endereço:</b> Praça da Matriz, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8339 S, 34.9061 W<br><b>Descrição:</b> Reconhecida pelo IPHAN como a <b>igreja mais antiga do Brasil em funcionamento</b>, a Igreja dos Santos Cosme e Damião foi erguida a partir de 1535. A estrutura original de taipa ruiu por volta de 1590, sendo substituída por uma construção em pedra e cal entre 1595 e 1597, mediante alvará real.<br> Ampliada no século XVIII com recursos da Coroa, teve sua importância reafirmada por estudiosos como o Prof. C. Smith, da Universidade da Pensilvânia. Em 1958, passou por restauração, recuperando características maneiristas originais.<br><b>Estilo:</b> Maneirista<br><b>Horário de visitação:</b><br>• Segunda: 9h às 15h<br>• Terça a sexta: 9h às 17h<br>• Sábado e domingo: 9h às 13h<br><b>Missas:</b><br>• Quinta: 19h<br>• Domingo: 7h e 19h<br><b>Entrada:</b> Gratuita<br><b>Acessibilidade:</b> Parcial – com rampas laterais e nave central livre<br><b>Serviços:</b> Missas dominicais, visitas guiadas<br><b>Estacionamento:</b> Na rua lateral da igreja<br><b>Instagram:</b> <a href="https://www.instagram.com/paroquiacosmeedamiaoigarassu/" target="_blank">@paroquiacosmeedamiaoigarassu</a><br><b>Proteção:</b> Tombamento federal pelo IPHAN – Decreto‑Lei nº 25/1937<br><b>Recomendações:</b> Visitação respeitosa, ideal para estudos de arquitetura sacra, turismo histórico e momentos de espiritualidade.`, coords: [-7.833936, -34.906166]},
+	{nome: "Igreja de Nossa Senhora da Conceição", desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8345 S, 34.9066 W<br><b>Descrição:</b> Integrada ao conjunto do Recolhimento do Sagrado Coração de Jesus, a igreja dedicada a Nossa Senhora da Conceição foi construída no século XVIII e conserva características da arquitetura religiosa colonial. Servia como espaço de oração e celebração das internas recolhidas e, até hoje, mantém seu uso litúrgico, especialmente em datas comemorativas.<br><b>Instagram:</b> <a href="https://www.instagram.com/oscjconventoigarassu/" target="_blank">@oscjconventoigarassu</a><br><b>Recomendações:</b> Participar de celebrações litúrgicas e visitas guiadas mediante agendamento<br><b>Proteção:</b> Edificação inserida na ambiência tombada do Sítio Histórico de Igarassu – IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.834319, -34.906405]},
+	{nome: "Igreja de Santo Antônio (Convento Franciscano)",
+  	desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.832645 S, 34.905061 W<br>
+	<b>Descrição:</b> Parte integrante do Convento Franciscano construído a partir de 1588 pelos frades da Ordem dos Franciscanos (OFM), a Igreja de Santo Antônio apresenta exemplar arquitetura barroca franciscana nordestina. Sua fachada, com galilé de três arcos e torre sineira lateral, dá acesso a um interior ricamente decorado com azulejos portugueses e talhas douradas do século XVII–XVIII :contentReference[oaicite:1]{index=1}.<br>
+	<b>Casamentos:</b> O templo é muito procurado para celebrações matrimoniais, devido ao seu valor histórico e beleza arquitetônica, sendo palco de cerimônias tradicionais com forte valor simbólico.<br>
+	<b>Contexto histórico:</b> Reconstruída após invasão holandesa (1630–1654), a igreja faz parte do conjunto que abriga o Museu Pinacoteca de Igarassu. Foi tombada pelo IPHAN em 1938 e está situada em pleno centro do Sítio Histórico, protegido desde 1972 :contentReference[oaicite:2]{index=2}.<br>
+	<b>Recomendações:</b> Ideal para cerimônias religiosas, estudos de arte barroca, arquitetura e fotografia patrimonial.<br>
+	<b>Proteção:</b> Tombamento federal pelo IPHAN – Decreto‑Lei nº 25/1937`,
+ 	coords: [-7.832645, -34.905061]
+	},
+	{
+  	nome: "Capela de Nossa Senhora do Livramento",
+  	desc: `<b>Endereço:</b> Praça da Bandeira, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833165 S, 34.906660 W<br>
+	<b>Descrição:</b> De origem incerta, a Capela de Nossa Senhora do Livramento é tradicionalmente atribuída ao terceiro quartel do século XVIII. A data inscrita em sua fachada, 1774, corresponde a uma importante reforma e ampliação, e não à sua construção original. Estudos de restauro revelaram que a estrutura inicial era de pedra e cal, com nave de menores proporções e sacristia sem piso superior.<br>
+	Em 1782, segundo o II Livro de Tombo da vila de Igarassu, a irmandade já estava oficialmente constituída, sob a presidência do Sr. Joaquim Rodrigues da Costa Queimado. Após o desabamento do teto em 1958, a capela foi restaurada em 1972 e novamente em 1986. Apresenta características do estilo barroco, com elementos arquitetônicos preservados graças aos esforços de conservação.<br>
+	<b>Visitação:</b> Apenas mediante <b>agendamento prévio</b> junto à Secretaria Executiva de Patrimônio Histórico<br>
+	<b>Email para agendamento:</b> <a href="mailto:patrimoniohistorico@igarassu.pe.gov.br">patrimoniohistorico@igarassu.pe.gov.br</a><br>
+	<b>Recomendações:</b> Ideal para pesquisadores, estudiosos de arte sacra e visitantes interessados no patrimônio religioso barroco<br>
+	<b>Proteção:</b> Integrante do Sítio Histórico de Igarassu, tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.833165, -34.906660]
+	},
+	{
+  	nome: "Capela de São Sebastião",
+  	desc: `<b>Endereço:</b> Largo de São Sebastião – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.831683 S, 34.908631 W<br>
+	<b>Descrição:</b> Construída em 1735, a Capela de São Sebastião é um dos marcos do barroco colonial em Igarassu. Sua arquitetura apresenta nave e torre únicas, com frontão característicos do estilo maneirista. O interior é simples, com paredes brancas e ausência de ornamentos dourados, refletindo a austeridade dos templos do período.<br>
+	<b>Atividades religiosas:</b> A capela é sede do grupo do <b>Terço dos Homens</b>, que se reúne semanalmente para orações e reflexões. Os encontros ocorrem às sextas-feiras à noite, promovendo a espiritualidade e a união da comunidade masculina local.<br>
+	<b>Visitação:</b> Aberta ao público durante as atividades religiosas e mediante agendamento prévio para visitas turísticas.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/paroquiacosmeedamiaoigarassu/" target="_blank">@paroquiacosmeedamiaoigarassu</a><br>
+	<b>Recomendações:</b> Ideal para interessados em arquitetura religiosa, história colonial e práticas de fé comunitária.<br>
+	<b>Categoria:</b> Patrimônio Religioso<br>
+	<b>Proteção:</b> Tombada pelo IPHAN desde 1951 como parte do conjunto do Sítio Histórico de Igarassu – Decreto-Lei nº 25/1937`,
+  	coords: [-7.831683, -34.908631]
+	},
+
+      ],
+
+      contemplação: [
+ 	{
+  	nome: "Mirante do Centro de Atendimento ao Turista (CAT)",
+  	desc: `<b>Endereço:</b> Rua Barbosa Lima, s/n – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834584 S, 34.906933 W<br>
+	<b>Descrição:</b> Anexo ao CAT – Centro de Atendimento ao Turista de Igarassu, o mirante é um espaço convidativo para contemplação do Sítio Histórico. Oferece uma vista panorâmica dos telhados coloniais, da vegetação e do horizonte, sendo ideal para descanso, conversas e fotos. Possui uma pequena praça com bancos e arborização.<br>
+	<b>Funcionamento do CAT:</b><br>
+	• Segunda a sexta: 8h às 16h<br>
+	• Sábado e domingo: 8h às 13h<br>
+	<b>Entrada:</b> Gratuita<br>
+	<b>Acessibilidade:</b> Total – entrada acessível, balcão baixo, atendimento inclusivo<br>
+	<b>Estacionamento:</b> Vagas públicas em frente<br>
+	<b>Serviços no CAT:</b> Informações turísticas, mapas, roteiros culturais, hospedagens e gastronomia local<br>
+	<b>E-mail:</b> <a href="mailto:turismo@igarassu.pe.gov.br">turismo@igarassu.pe.gov.br</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/sepacturigarassu/" target="_blank">@sepacturigarassu</a><br>
+	<b>Recomendações:</b> Inicie seu roteiro por aqui para aproveitar orientações e planejar sua visita com apoio técnico da equipe do CAT.<br>
+	<b>Proteção:</b> Localizado na área do Sítio Histórico de Igarassu, tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.834584, -34.906933]
+	},
+	{nome: "Mirante do Cemitério de Igarassu", desc: "<b>Endereço:</b> Rua da Saudade, s/n – Sítio Histórico, Igarassu‑PE, em frente do Cemitério Público<br><b>Coordenadas:</b> 7.8355 S, 34.9095 W<br><b>Horário:</b> Livre acesso<br><b>Acessibilidade:</b> Parcial – calçamento em pedra irregular<br><b>Estacionamento:</b> Via pública ao redor<br><b>Descrição:</b> Mirante com vista panorâmica para o conjunto colonial de Igarassu e áreas verdes no entorno. Espaço utilizado para contemplação e registro fotográfico por visitantes e moradores.<br><b>Recomendações:</b> Evitar acesso noturno; cuidado com desníveis e bordas<br><b>Proteção:</b> Parte integrante da ambiência protegida pelo IPHAN – Decreto‑Lei nº 25/1937<br>", coords: [-7.835472, -34.909554]},
+        {nome: "Gramado do Sítio Histórico", desc: `<b>Endereço:</b> Sítio Histórico, Igarassu‑PE<br><b>Coordenadas:</b> 7.8344 S, 34.9058 W<br><b>Descrição:</b> Amplo espaço de contemplação em meio ao casario colonial, ideal para observar o nascer do sol e da lua. Local privilegiado para piqueniques, encontros culturais e acompanhamento de festividades tradicionais, como cortejos e celebrações ao ar livre.<br><b>Recomendações:</b> Levar toalha ou esteira, respeitar o patrimônio ao redor, ideal para fotografias<br><b>Proteção:</b> Inserido na ambiência tombada do Sítio Histórico pelo IPHAN – Decreto‑Lei nº 25/1937`, coords: [-7.834459, -34.905842]},
+	{nome: "Refúgio das Bromélias",
+  	desc: `<b>Endereço:</b> Às margens do Rio Igarassu – Sítio Histórico<br>
+	<b>Coordenadas:</b> 7.833636 S, 34.904809 W<br>
+	<b>⚠ Aviso:</b> Atrativo turístico de propriedade particular. A visitação requer agendamento prévio.<br>
+	<b>Agendamento:</b> Exclusivamente pelo formulário: <a href="https://forms.gle/5yYDdjsEAFcjDBU37" target="_blank">Clique aqui para agendar</a><br>
+	<b>Dúvidas:</b> Caso não sejam esclarecidas no formulário, utilize o WhatsApp: <a href="https://wa.me/5581988174392" target="_blank">(81) 98817-4392</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/refugiodasbromelias/" target="_blank">@refugiodasbromelias</a><br>
+	<b>💵 Valores:</b><br>
+	• Entrada individual: R$ 10,00<br>
+	• Escolas (por estudante): R$ 5,00<br>
+	• Passeio de jangada (opcional): R$ 5,00<br>
+	<b>🕐 Horário de funcionamento:</b><br>
+	• Terça a domingo: das 9h às 14h30<br>
+	<b>Recomendações:</b> Ideal para quem busca contato com a natureza, trilhas leves, apreciação da vegetação nativa e passeios rústicos de jangada pelo rio Igarassu.<br>
+	<b>Proteção:</b> Situado na zona de amortecimento do Sítio Histórico de Igarassu (IPHAN)`,
+  	coords: [-7.833636, -34.904809]
+	},
+	{
+  	nome: "Pôr do Sol na Igreja dos Santos Cosme e Damião",
+  	desc: `<b>Endereço:</b> Igreja dos Santos Cosme e Damião – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833761 S, 34.906303 W<br>
+	<b>Descrição:</b> Um dos momentos mais sublimes do Sítio Histórico de Igarassu é o entardecer visto da Igreja dos Santos Cosme e Damião. A luz do pôr do sol incide sobre vegetação, criando um cenário ideal para contemplação, oração, fotografia e visitas culturais.<br>
+	<b>Acesso:</b><br>
+	• Disponível apenas mediante agendamento prévio<br>
+	• Ou durante plantões pastorais do Pároco às <b>quintas-feiras</b><br>
+	<b>Recomendações:</b> Visitar no fim da tarde para desfrutar da vista e, se possível, combinar com agendamento do museu ou participação nas missas.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/paroquiacosmeedamiaoigarassu/" target="_blank">@paroquiacosmeedamiaoigarassu</a><br>
+	<b>Proteção:</b> Parte integrante do Sítio Histórico tombado pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.833761, -34.906303]
+	},
+	{
+  	nome: "Pôr do Sol do Museu Histórico de Igarassu",
+  	desc: `<b>Endereço:</b> Museu Histórico de Igarassu – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833957 S, 34.906453 W<br>
+	<b>Descrição:</b> Um dos ângulos mais privilegiados para contemplar o pôr do sol no Sítio Histórico de Igarassu é a área posterior do Museu Histórico. A luz suave do entardecer se projeta sobre o rio, compondo um cenário ideal para contemplação e fotografia.<br>
+	<b>Acesso:</b> Permitido apenas mediante <b>agendamento prévio</b> ou durante <b>eventos oficiais</b> promovidos pelo museu.<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/mhigarassu/" target="_blank">@mhigarassu</a><br>
+	<b>Recomendações:</b> Ideal para quem aprecia cultura, história e fotografia ao ar livre. O local proporciona um dos entardeceres mais belos de Pernambuco.<br>
+	<b>Proteção:</b> Imóvel integrante do Sítio Histórico tombado pelo IPHAN – Decreto‑Lei nº 25/1937`,
+  	coords: [-7.833957, -34.906453]
+	},
+
+      ],
+
+     gastronomia: [
+        {
+  	nome: "Boulevard Gastronômico de Rua do Sitio Historico de Igarassu",
+  	desc: `<b>Endereço:</b> Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834313 S, 34.906193 W<br>
+	<b>Descrição:</b> Espaço urbano consolidado para a comercialização de lanches e refeições rápidas, o Boulevard Gastronômico é formado por barracas, trailers e food trucks dispostos de forma regulamentada, com identidade visual padronizada e acompanhamento da Secretaria Executiva de Patrimônio Histórico, Cultura e Turismo. Integra a dinâmica cultural do Sítio Histórico, conectando gastronomia popular e vivência patrimonial.<br>
+	<b>Funcionamento:</b> Diariamente, com maior movimento no fim de tarde e à noite, especialmente nos finais de semana e durante eventos religiosos e culturais<br>
+	<b>Recomendações:</b> Ideal para visitantes que desejam conhecer a culinária popular local em um ambiente democrático, seguro e integrado ao circuito histórico<br>
+	<b>Categoria:</b> Rota Gastronômica Popular<br>
+	<b>Proteção:</b> Localizado na área do Sítio Histórico de Igarassu, tombada pelo IPHAN – Decreto-Lei nº 25/1937`,
+  	coords: [-7.834356, -34.906118]
+	},
+	{
+  	nome: "Polloka Pizzaria e Açaiteria",
+  	desc: `<b>Endereço:</b> Rua Dantas Barreto – PE<br>
+	<b>Coordenadas:</b> 7.832908 S, 34.905815 W<br>
+	<b>Descrição:</b> A Polloka é uma pizzaria e açaiteria que combina sabor, descontração e tradição em pleno coração do Sítio Histórico de Igarassu. Ideal para uma pausa gastronômica após o passeio, o local oferece cardápio variado com pizzas artesanais e açaís bem servidos. Ambiente acolhedor e atendimento atencioso tornam a experiência ainda mais especial.<br>
+	<b>Funcionamento:</b> Terça a domingo<br>
+	<b>Delivery:</b> Das 17h30 às 22h30<br>
+	<b>Pedidos por loja:</b><br>
+	• <b>Tabatinga:</b> <a href="https://wa.me/5581983488461" target="_blank">(81) 98348‑8461</a><br>
+	• <b>Sítio Histórico:</b> <a href="https://wa.me/5581992361549" target="_blank">(81) 99236‑1549</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/polloka.pizzaeacai/" target="_blank">@polloka.pizzaeacai</a><br>
+	<b>Recomendações:</b> Ideal para jantares rápidos ou um lanche no fim de tarde após visitar os museus e igrejas da região histórica.<br>
+	<b>Categoria:</b> Rota Gastronômica`,
+  	coords: [-7.832908, -34.905815]
+	},
+	{
+  	"nome": "Donatário Café",
+  	"desc": `<b>Endereço:</b> Rua Bernardo Vieira de Melo, 64 – Sítio Histórico, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.833600 S, 34.906400 W<br>
+	<b>Descrição:</b> Localizado no coração do Sítio Histórico de Igarassu, o Donatário Café oferece uma experiência única que combina o aroma do café com o charme do patrimônio local. O ambiente acolhedor é ideal para encontros, leitura ou simplesmente apreciar uma boa xícara de café.<br>
+	<b>Horário de funcionamento:</b><br>
+	• Segunda a sexta: 13h às 22h<br>
+	• Sábado: 15h às 22h<br>
+	<b>Instagram:</b> <a href='https://www.instagram.com/donatariocafe/' target='_blank'>@donatariocafe</a><br>
+	<b>Recomendações:</b> Perfeito para quem deseja desfrutar de momentos tranquilos em um ambiente histórico, saboreando cafés especiais e acompanhamentos deliciosos.`,
+  	"coords": [-7.833739, -34.906397]
+	},
+	{
+  	"nome": "Casarão Rosa Lounge",
+  	"desc": `<b>Endereço:</b> Rua Dr. João Elísio, nº 17 – Sítio Histórico, Igarassu‑PE, CEP 53620‑060<br>
+	<b>Coordenadas:</b> 7.832985 S, 34.906807 W<br>
+	<b>Descrição:</b> O Casarão Rosa Lounge é um espaço multifuncional e charmoso localizado no coração do Sítio Histórico de Igarassu. Com atmosfera acolhedora e arquitetura preservada, abriga diversas lojas e pontos gastronômicos em um só lugar, tornando-se referência em lazer e cultura local.<br>
+	<b>Principais atrativos:</b><br>
+	• <b>Cafeteria:</b> <a href="https://www.instagram.com/donnairenecafe/" target="_blank">@donnairenecafe</a><br>
+	• <b>Restaurante:</b> <a href="https://www.instagram.com/almeidarestaurante4/" target="_blank">@almeidarestaurante4</a><br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/casaraorosalounge/" target="_blank">@casaraorosalounge</a><br>
+	<b>WhatsApp para pedidos:</b> <a href="https://wa.me/5581982607260" target="_blank">(81) 98260‑7260</a><br>
+	<b>Recomendações:</b> Ideal para uma pausa entre visitas aos atrativos históricos, compras em lojas artesanais e encontros culturais num ambiente sofisticado e regional.`,
+  	"coords": [-7.832985, -34.906807]
+	},
+	{
+  	nome: "Paranã Puka – Cozinha Cultural",
+  	desc: `<b>Endereço:</b> Avenida Marechal Hermes, Igarassu‑PE<br>
+	<b>Coordenadas:</b> 7.834824 S, 34.905480 W<br>
+	<b>Descrição:</b> O Paranã Puka é um espaço gastronômico e cultural que oferece muito mais que alimentação: promove encontros, sabores e tradições em pleno coração do Sítio Histórico de Igarassu. Com culinária afetiva e ambiente acolhedor, o espaço também sedia apresentações artísticas e colabora com os movimentos culturais da cidade.<br>
+	<b>Horário de funcionamento:</b><br>
+	• Segunda, terça e quarta: 11h30 às 16h<br>
+	• Quinta, sexta e sábado: 11h30 às 23h<br>
+	<b>Instagram:</b> <a href="https://www.instagram.com/parana_puka/" target="_blank">@parana_puka</a><br>
+	<b>WhatsApp:</b> <a href="https://wa.me/5581982981283" target="_blank">(81) 98298-1283</a><br>
+	<b>Recomendações:</b> Ideal para quem deseja vivenciar a culinária local com toque artístico, experimentar pratos autorais e curtir eventos em um ambiente autêntico.<br>
+	<b>Proteção:</b> Localizado na ambiência do Sítio Histórico tombado pelo IPHAN – Decreto‑Lei nº 25/1937`,
+ 	 coords: [-7.834824, -34.905480]
+	},
+      ],
+
+     gastro: [
+        {nome: "Food Park do Sítio Histórico", desc: "Espaço de gastronomia local, cultura e eventos ao ar livre.", coords: [-7.8344, -34.9062], foodpark: true}
+	
+     ]
+    };
+
+    function mostrarRota(tipo) {
+      if (routingControl) map.removeControl(routingControl);
+      currentMarkers.forEach(m => map.removeLayer(m));
+      currentMarkers = [];
+
+      if (foodParkShape) map.removeLayer(foodParkShape);
+      if (tipo === "gastronomia") {
+        foodParkShape = L.rectangle([[-7.835092, -34.906252], [-7.834303, -34.906153]], {
+          color: "#e74c3c",
+          weight: 2,
+          fillOpacity: 0.4
+        }).addTo(map).bindPopup("<b>🍴 Boulevard Gastronômico de Rua do Sitio Historico de Igarassu</b><br>Espaço reservado para gastronomia local e eventos culturais.");
+      }
+
+      const bounds = [];
+
+      rotas[tipo].forEach(p => {
+        const marker = L.marker(p.coords).addTo(map)
+         .bindPopup(`
+  	<div style="max-height: 200px; overflow-y: auto;">
+    		<b>${p.nome}</b><br>${p.desc}
+   		<br><button onclick="irAte(${p.coords[0]}, ${p.coords[1]})">🔀 Ir até aqui</button>
+  	</div>
+	`);
+
+        currentMarkers.push(marker);
+        bounds.push(p.coords);
+      });
+
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [30, 30] });
+      }
+    }
+
+    function irAte(lat, lng) {
+      if (!userMarker) {
+        alert("Aguardando localização...");
+        return;
+      }
+
+      const destino = L.latLng(lat, lng);
+      const origem = userMarker.getLatLng();
+
+      if (routingControl) map.removeControl(routingControl);
+
+      routingControl = L.Routing.control({
+        waypoints: [origem, destino],
+        routeWhileDragging: false,
+        createMarker: () => null,
+        fitSelectedRoutes: false,
+        show: false
+      }).addTo(map);
+
+      routingControl.on('routesfound', function(e) {
+        const route = e.routes[0];
+        const bounds = L.latLngBounds(route.coordinates);
+        map.fitBounds(bounds, { padding: [30, 30] });
+
+        navigator.geolocation.watchPosition(
+          pos => {
+            const newLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+            if (userMarker) userMarker.setLatLng(newLatLng);
+            map.setView(newLatLng, Math.max(map.getZoom() - 1, 14));
+          },
+          err => console.warn(`Erro ao rastrear: ${err.message}`),
+          { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+        );
+
+        document.getElementById('cancelarRotaBox').style.display = 'block';
+      });
+    }
+
+    function cancelarRota() {
+      if (routingControl) {
+        map.removeControl(routingControl);
+        routingControl = null;
+      }
+      if (userMarker) {
+        map.setView(userMarker.getLatLng(), 17);
+        userMarker.openPopup();
+      }
+      document.getElementById('cancelarRotaBox').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
