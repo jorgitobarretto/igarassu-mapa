@@ -131,12 +131,24 @@
       iconAnchor: [15, 15]
     });
 
-    map.locate({setView: true, maxZoom: 18, watch: true});
-    map.on('locationfound', function(e) {
-      if (userMarker) map.removeLayer(userMarker);
-      userMarker = L.marker(e.latlng, {icon: avatarIcon}).addTo(map)
-        .bindPopup("Você está aqui").openPopup();
-    });
+    let primeiraLocalizacao = true;
+
+map.locate({ watch: true });
+
+map.on('locationfound', function(e) {
+  if (!userMarker) {
+    userMarker = L.marker(e.latlng, {icon: avatarIcon}).addTo(map).bindPopup("Você está aqui");
+  } else {
+    userMarker.setLatLng(e.latlng);
+  }
+
+  if (primeiraLocalizacao) {
+    map.setView(e.latlng, 18);
+    userMarker.openPopup();
+    primeiraLocalizacao = false;
+  }
+});
+
     map.on('locationerror', function(e) {
       alert("Erro ao detectar sua localização.");
     });
